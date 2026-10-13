@@ -121,6 +121,20 @@ def scenario_statuses(report: list[dict[str, Any]]) -> dict[str, str]:
     return statuses
 
 
+def error_text(error_message: Any) -> str:
+    """Return a step's ``result.error_message`` as one string.
+
+    behave's JSON formatter writes a multi-line message as a list of lines
+    (``split_text_into_lines``), and a one-line message as a plain string.
+    Tracebacks are multi-line, so most real failures arrive as a list.
+    """
+    if not error_message:
+        return ""
+    if isinstance(error_message, list):
+        return "\n".join(str(line) for line in error_message)
+    return str(error_message)
+
+
 def is_success(counts: dict[str, int]) -> bool:
     """Return True only when every counted scenario passed or was skipped.
 

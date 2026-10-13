@@ -75,6 +75,7 @@ def _run_summary(
     *,
     shadowing_package: bool = False,
     truncated: bool = False,
+    report: list[dict] | None = None,
 ) -> tuple[str, str]:
     """Run the shipped step script against a synthetic report.
 
@@ -85,11 +86,14 @@ def _run_summary(
     When ``truncated`` is set, the closing ``]`` is dropped, as behave leaves
     it when a lane crashes before its formatter's ``close()``.
 
+    ``report`` replaces the synthetic report built from ``scenarios``.
+
     Returns ``(stdout, job-summary markdown)``.
     """
     results_dir = tmp_path / "results"
     results_dir.mkdir()
-    report = [{"name": "synthetic feature", "elements": [_scenario(s) for s in scenarios]}]
+    if report is None:
+        report = [{"name": "synthetic feature", "elements": [_scenario(s) for s in scenarios]}]
     text = json.dumps(report)
     (results_dir / "results.json").write_text(text[:-1] if truncated else text, encoding="utf-8")
 
@@ -219,6 +223,55 @@ def test_failed_run_is_reported_as_failed(tmp_path):
     assert summary.startswith("## ❌ E2E Results")
 
 
+def test_failure_with_a_list_valued_error_message_is_summarised(tmp_path):
+    """behave writes a multi-line error_message as a list of lines (#977)."""
+    failed = {
+        "type": "scenario",
+        "status": "failed",
+        "name": "broken scenario",
+        "steps": [
+            {
+                "name": "the thing works",
+                "result": {
+                    "status": "failed",
+                    "error_message": [
+                        "Assertion Failed: boom",
+                        "Traceback (most recent call last):",
+                    ],
+                },
+            }
+        ],
+    }
+    stdout, summary = _run_summary(
+        tmp_path, [], report=[{"name": "synthetic feature", "elements": [failed]}]
+    )
+
+    assert "E2E FAILED" in stdout
+    assert "error: Assertion Failed: boom" in stdout
+    assert summary.startswith("## ❌ E2E Results")
+    assert "| synthetic feature | broken scenario | `the thing works` | Assertion Failed: boom |" in summary
+
+
+def test_failure_with_a_string_error_message_is_summarised(tmp_path):
+    failed = {
+        "type": "scenario",
+        "status": "failed",
+        "name": "broken scenario",
+        "steps": [
+            {
+                "name": "the thing works",
+                "result": {"status": "failed", "error_message": "AssertionError: nope"},
+            }
+        ],
+    }
+    stdout, summary = _run_summary(
+        tmp_path, [], report=[{"name": "synthetic feature", "elements": [failed]}]
+    )
+
+    assert "error: AssertionError: nope" in stdout
+    assert "| AssertionError: nope |" in summary
+
+
 def test_consumer_scripts_package_does_not_shadow_the_checkout_module(tmp_path):
     """gnome-e2e runs in arbitrary workspaces; a local scripts/ must not win."""
     stdout, summary = _run_summary(
@@ -282,7 +335,7 @@ def test_step_imports_the_tested_summary_module():
 
     assert "_testsuite/scripts/e2e_summary.py" in step
     assert "spec_from_file_location" in step
-    for helper in ("count_scenarios", "is_success", "summary_icon"):
+    for helper in ("count_scenarios", "is_success", "summary_icon", "error_text"):
         assert helper in step
 
 

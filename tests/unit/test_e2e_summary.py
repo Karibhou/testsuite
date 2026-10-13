@@ -3,6 +3,7 @@
 import json
 from scripts.e2e_summary import (
     count_scenarios,
+    error_text,
     is_success,
     load_report,
     scenario_statuses,
@@ -212,3 +213,20 @@ def test_load_report_trailing_comma_without_object_returns_features():
 
     assert [f["name"] for f in recovered] == ["a", "b"]
     assert not complete
+
+
+def test_error_text_joins_behave_list_of_lines():
+    # behave's JSON formatter splits a multi-line error_message into a list.
+    assert error_text(["Assertion Failed: boom", "Traceback (most recent call last):"]) == (
+        "Assertion Failed: boom\nTraceback (most recent call last):"
+    )
+
+
+def test_error_text_keeps_a_single_line_string():
+    assert error_text("AssertionError: nope") == "AssertionError: nope"
+
+
+def test_error_text_treats_missing_message_as_empty():
+    assert error_text(None) == ""
+    assert error_text("") == ""
+    assert error_text([]) == ""
