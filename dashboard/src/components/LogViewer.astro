@@ -206,13 +206,26 @@ const { steps } = Astro.props;
         let matchesInPre = 0;
         const walkTextNodes = (node) => {
           if (node.nodeType === Node.TEXT_NODE) {
-            const matches = node.nodeValue.match(regex);
-            if (matches) {
+            const text = node.nodeValue;
+            const matches = Array.from(text.matchAll(regex));
+            if (matches.length > 0) {
               matchesInPre += matches.length;
               totalMatches += matches.length;
-              
+
+              // Build the highlighted replacement from DOM nodes. The text node
+              // holds the decoded log text, so writing it back through innerHTML
+              // would re-parse any literal markup in the logs as live HTML.
               const span = document.createElement('span');
-              span.innerHTML = node.nodeValue.replace(regex, '<mark class="bg-yellow-500/40 text-yellow-100 rounded">$1</mark>');
+              let cursor = 0;
+              for (const match of matches) {
+                span.appendChild(document.createTextNode(text.slice(cursor, match.index)));
+                const mark = document.createElement('mark');
+                mark.className = 'bg-yellow-500/40 text-yellow-100 rounded';
+                mark.textContent = match[0];
+                span.appendChild(mark);
+                cursor = match.index + match[0].length;
+              }
+              span.appendChild(document.createTextNode(text.slice(cursor)));
               node.parentNode.replaceChild(span, node);
             }
           } else if (node.nodeType === Node.ELEMENT_NODE && node.nodeName !== 'MARK') {
