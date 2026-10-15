@@ -412,3 +412,249 @@ class TestNoCoredumpEntriesExist:
         with patch("subprocess.run", return_value=proc):
             with pytest.raises(AssertionError, match="coredumpctl failed"):
                 self.mod.no_coredump_entries_exist(ctx, "gnome-shell")
+
+
+# ---------------------------------------------------------------------------
+# run_ssh — timeouts must clear stale results before re-raising
+# ---------------------------------------------------------------------------
+
+def _stale_context(**kwargs):
+    ctx = _make_context(**kwargs)
+    ctx.command_stdout = "stale output"
+    ctx.last_command_output = "stale output"
+    ctx.ssh_rc = 0
+    ctx.last_ssh_result = _make_proc(stdout="stale output\n")
+    return ctx
+
+
+def _assert_cleared(ctx):
+    assert ctx.command_stdout == ""
+    assert ctx.last_command_output == ""
+    assert ctx.ssh_rc == -1
+    assert ctx.last_ssh_result is None
+
+
+class TestRunSshTimeout:
+    def setup_method(self):
+        self.mod = _import_ssh_steps()
+
+    def test_remote_timeout_clears_previous_result_and_reraises(self):
+        ctx = _stale_context()
+        exc = self.mod.subprocess.TimeoutExpired(cmd="ssh", timeout=60)
+        with patch("subprocess.run", side_effect=exc):
+            with pytest.raises(self.mod.subprocess.TimeoutExpired):
+                self.mod.run_ssh(ctx, "sleep 999")
+        _assert_cleared(ctx)
+
+    def test_local_timeout_clears_previous_result_and_reraises(self):
+        ctx = _stale_context(vm_ip="")
+        exc = self.mod.subprocess.TimeoutExpired(cmd="bash", timeout=60)
+        with patch("subprocess.run", side_effect=exc):
+            with pytest.raises(self.mod.subprocess.TimeoutExpired):
+                self.mod.run_ssh(ctx, "sleep 999")
+        _assert_cleared(ctx)
+
+    def test_timeout_is_forwarded_to_subprocess(self):
+        ctx = _make_context()
+        with patch("subprocess.run", return_value=_make_proc("ok\n")) as mock_run:
+            self.mod.run_ssh(ctx, "echo ok", timeout=7)
+        assert mock_run.call_args.kwargs["timeout"] == 7
+
+
+class TestRunSshCommandSteps:
+    def setup_method(self):
+        self.mod = _import_ssh_steps()
+
+    def test_run_ssh_command_uses_default_timeout(self):
+        ctx = _make_context()
+        with patch.object(self.mod, "run_ssh") as mock_run:
+            self.mod.run_ssh_command(ctx, "uptime")
+        mock_run.assert_called_once_with(ctx, "uptime")
+
+    def test_run_long_ssh_command_allows_fifteen_minutes(self):
+        ctx = _make_context()
+        with patch.object(self.mod, "run_ssh") as mock_run:
+            self.mod.run_long_ssh_command(ctx, "bootc upgrade")
+        mock_run.assert_called_once_with(ctx, "bootc upgrade", timeout=900)
+
+
+class TestVmReachableOverSshFailures:
+    def setup_method(self):
+        self.mod = _import_ssh_steps()
+
+    def test_timeouts_are_retried_and_reported(self):
+        ctx = _make_context(vm_ip="10.0.0.9")
+        exc = self.mod.subprocess.TimeoutExpired(cmd="ssh", timeout=20)
+        with patch.object(self.mod, "run_ssh", side_effect=exc) as mock_run:
+            with patch("tests.shared.ssh_steps.sleep") as mock_sleep:
+                with pytest.raises(AssertionError) as err:
+                    self.mod.vm_reachable_over_ssh(ctx)
+        assert mock_run.call_count == 5
+        assert all(c.kwargs == {"timeout": 20} for c in mock_run.call_args_list)
+        assert mock_sleep.call_count == 4
+        assert "10.0.0.9" in str(err.value)
+        assert "after 5 attempts" in str(err.value)
+        assert "timeout after 20s" in str(err.value)
+
+    def test_zero_exit_with_unexpected_stdout_is_not_reachable(self):
+        ctx = _make_context()
+        with patch.object(self.mod, "run_ssh", return_value=("banner", 0)):
+            with patch("tests.shared.ssh_steps.sleep"):
+                with pytest.raises(AssertionError, match="rc=0, stdout='banner'"):
+                    self.mod.vm_reachable_over_ssh(ctx)
+
+    def test_last_error_reported_after_mixed_failures(self):
+        ctx = _make_context()
+        exc = self.mod.subprocess.TimeoutExpired(cmd="ssh", timeout=20)
+        side_effects = [exc, exc, exc, exc, ("", 255)]
+        with patch.object(self.mod, "run_ssh", side_effect=side_effects):
+            with patch("tests.shared.ssh_steps.sleep"):
+                with pytest.raises(AssertionError) as err:
+                    self.mod.vm_reachable_over_ssh(ctx)
+        assert "rc=255" in str(err.value)
+        assert "timeout" not in str(err.value)
+
+
+# ---------------------------------------------------------------------------
+# Assertion steps — these are the pass/fail oracles for every SSH scenario
+# ---------------------------------------------------------------------------
+
+class TestSshOutputIs:
+    def setup_method(self):
+        self.mod = _import_ssh_steps()
+
+    def test_passes_on_exact_match_after_strip(self):
+        ctx = _make_context()
+        ctx.command_stdout = "  active\n"
+        self.mod.ssh_output_is(ctx, "active")
+
+    def test_raises_on_mismatch(self):
+        ctx = _make_context()
+        ctx.command_stdout = "inactive"
+        with pytest.raises(AssertionError, match="Expected 'active', got 'inactive'"):
+            self.mod.ssh_output_is(ctx, "active")
+
+    def test_substring_is_not_a_match(self):
+        ctx = _make_context()
+        ctx.command_stdout = "active (running)"
+        with pytest.raises(AssertionError):
+            self.mod.ssh_output_is(ctx, "active")
+
+    def test_missing_output_attribute_is_treated_as_empty(self):
+        ctx = types.SimpleNamespace()
+        with pytest.raises(AssertionError, match="got ''"):
+            self.mod.ssh_output_is(ctx, "active")
+
+
+class TestSshOutputStrippedIs:
+    def setup_method(self):
+        self.mod = _import_ssh_steps()
+
+    def test_passes_on_match_after_strip(self):
+        ctx = _make_context()
+        ctx.command_stdout = "\n enabled \n"
+        self.mod.ssh_output_stripped_is(ctx, "enabled")
+
+    def test_raises_on_mismatch(self):
+        ctx = _make_context()
+        ctx.command_stdout = "disabled\n"
+        with pytest.raises(AssertionError, match="Expected 'enabled', got 'disabled'"):
+            self.mod.ssh_output_stripped_is(ctx, "enabled")
+
+
+class TestSshReturnCodeIs:
+    def setup_method(self):
+        self.mod = _import_ssh_steps()
+
+    def test_passes_when_code_matches_string_argument(self):
+        ctx = _make_context()
+        ctx.ssh_rc = 0
+        self.mod.ssh_return_code_is(ctx, "0")
+
+    def test_passes_for_expected_nonzero_code(self):
+        ctx = _make_context()
+        ctx.ssh_rc = 1
+        self.mod.ssh_return_code_is(ctx, "1")
+
+    def test_raises_with_stdout_and_stderr_on_mismatch(self):
+        ctx = _make_context()
+        result = _make_proc(stdout="partial\n", returncode=3)
+        result.stderr = "unit not found"
+        ctx.ssh_rc = 3
+        ctx.last_ssh_result = result
+        with pytest.raises(AssertionError) as err:
+            self.mod.ssh_return_code_is(ctx, "0")
+        message = str(err.value)
+        assert "exited 3, expected 0" in message
+        assert "stdout: partial" in message
+        assert "stderr: unit not found" in message
+
+    def test_raises_after_timeout_reset(self):
+        """A timed-out command (rc=-1, no result) must never satisfy rc 0."""
+        ctx = _make_context()
+        ctx.ssh_rc = -1
+        ctx.last_ssh_result = None
+        with pytest.raises(AssertionError, match="exited -1, expected 0"):
+            self.mod.ssh_return_code_is(ctx, "0")
+
+    def test_raises_when_no_command_has_run(self):
+        ctx = types.SimpleNamespace()
+        with pytest.raises(AssertionError, match="exited None, expected 0"):
+            self.mod.ssh_return_code_is(ctx, "0")
+
+
+class TestSshOutputNotEmpty:
+    def setup_method(self):
+        self.mod = _import_ssh_steps()
+
+    def test_passes_with_output(self):
+        ctx = _make_context()
+        ctx.command_stdout = "x"
+        self.mod.ssh_output_not_empty(ctx)
+
+    @pytest.mark.parametrize("stdout", ["", "   ", "\n\t\n"])
+    def test_raises_on_empty_or_whitespace_output(self, stdout):
+        ctx = _make_context()
+        ctx.command_stdout = stdout
+        with pytest.raises(AssertionError, match="SSH command output is empty"):
+            self.mod.ssh_output_not_empty(ctx)
+
+
+class TestSshOutputIsNot:
+    def setup_method(self):
+        self.mod = _import_ssh_steps()
+
+    def test_passes_when_output_differs(self):
+        ctx = _make_context()
+        ctx.command_stdout = "running"
+        self.mod.ssh_output_is_not(ctx, "degraded")
+
+    def test_raises_when_output_matches_after_strip(self):
+        ctx = _make_context()
+        ctx.command_stdout = " degraded\n"
+        with pytest.raises(AssertionError, match="SSH command output is 'degraded'"):
+            self.mod.ssh_output_is_not(ctx, "degraded")
+
+
+class TestSshOutputContains:
+    def setup_method(self):
+        self.mod = _import_ssh_steps()
+
+    def test_passes_when_text_is_present(self):
+        ctx = _make_context()
+        ctx.command_stdout = "ghcr.io/projectbluefin/bluefin:stable\n"
+        self.mod.ssh_output_contains(ctx, "projectbluefin")
+
+    def test_raises_and_shows_output_when_text_is_missing(self):
+        ctx = _make_context()
+        ctx.command_stdout = "ghcr.io/ublue-os/bluefin:stable"
+        with pytest.raises(AssertionError) as err:
+            self.mod.ssh_output_contains(ctx, "projectbluefin")
+        assert "does not contain 'projectbluefin'" in str(err.value)
+        assert "ghcr.io/ublue-os/bluefin:stable" in str(err.value)
+
+    def test_is_case_sensitive(self):
+        ctx = _make_context()
+        ctx.command_stdout = "Active"
+        with pytest.raises(AssertionError):
+            self.mod.ssh_output_contains(ctx, "active")
