@@ -174,5 +174,7 @@ def test_every_expanded_shard_resolves_to_the_suite_it_came_from(
 def test_sharded_suites_actually_shard(expand_program):
     # Guards the expansion side against silently collapsing to one job: the
     # suites the docs promise are split must still produce several entries.
-    for suite in ("smoke", "common", "kde-smoke"):
+    # kde-smoke is deliberately absent: #989 stops sharding it, and its shards
+    # are already covered per suite by the parametrized resolver test above.
+    for suite in ("smoke", "common"):
         assert len(_expand(expand_program, suite)) > 1, f"{suite} is no longer sharded"
