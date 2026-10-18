@@ -84,7 +84,7 @@ action hands `inputs.image` verbatim to `podman pull` / `bootc install`.
 ```yaml
 - uses: ./.github/actions/gnome-e2e
   with:
-    # requires an image that carries gnome-ponytail-daemon (blocker 2 above)
+    # requires an image that carries gnome-ponytail-daemon (blocker 1 above)
     image: quay.io/gnome_infrastructure/gnome-build-meta@sha256:57eeef917d057e37d8d5824fab195ebf3b0ad49fc1ca191b7bc02b82418ed981
     suite: extensions   # uses tests/extensions/ (landed with #914)
 ```
@@ -109,9 +109,8 @@ REMOTE
 ```
 
 `session=wayland` and a non-empty AT-SPI registry reply confirm the real session and AT-SPI.
-`gnome-extensions list` is the pre-install inventory: the guest boots stock GNOME OS, so the four
-hive extensions are installed by `extension_lifecycle.feature` during the run and are **not**
-expected here beforehand. Provision failures are infrastructure errors, never green.
+`gnome-extensions list` is the pre-run inventory to confirm the four extensions are staged
+and discoverable before GNOME Shell starts (or verify which are discovered).
 
 ### 3. Re-run individual scenarios in the guest
 
@@ -134,7 +133,7 @@ ssh -i /tmp/gnome_e2e_key -o StrictHostKeyChecking=no \
 ```
 
 Swap in another per-extension feature path as needed. Re-run the `gnome-extensions list` canary
-after `extension_lifecycle.feature`; it must now list the four hive extensions.
+after `extension_lifecycle.feature` to inspect active and enabled state.
 
 ### 4. Gate the run, against the results copied back to the host workspace
 
@@ -161,7 +160,7 @@ A run passes only if **at least one scenario genuinely passed and nothing errore
   `e2e_summary.SUCCESS_STATUSES`, so a future behave status fails this gate too
 
 Deliberately stricter than the general e2e headline (`scripts/e2e_summary.is_success`), which
-scores an all-skipped or empty run green for suites that ship only `@future` scenarios.
+scores an all-skipped run green for suites that ship only `@future` scenarios.
 
 ## Security posture
 

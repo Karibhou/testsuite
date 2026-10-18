@@ -6,10 +6,10 @@ extensions, and runs a qecore/Behave input+AT-SPI scenario. This module decides
 whether that run is a genuine pass.
 
 The gate is deliberately stricter than the general e2e headline
-(``scripts/e2e_summary.is_success``).  ``is_success`` scores an all-skipped or
-empty run green because whole suites legitimately ship only ``@future`` /
-``@quarantine`` scenarios.  An extension-validation run proves nothing unless at
-least one scenario genuinely passed and nothing errored, so this gate requires
+(``scripts/e2e_summary.is_success``).  ``is_success`` scores an all-skipped run
+green because whole suites legitimately ship only ``@future`` / ``@quarantine``
+scenarios.  An extension-validation run proves nothing unless at least one
+scenario genuinely passed and nothing errored, so this gate requires
 ``passed > 0`` and rejects empty, all-skipped, undefined, untested, and
 error/hook-error runs (issue #908 acceptance criteria).
 
@@ -33,7 +33,7 @@ if _SPEC is None or _SPEC.loader is None:
 _MOD = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_MOD)
 
-SUCCESS_STATUSES: set[str] = _MOD.SUCCESS_STATUSES
+SUCCESS_STATUSES: tuple[str, ...] = _MOD.SUCCESS_STATUSES
 count_scenarios = _MOD.count_scenarios
 
 
@@ -69,7 +69,7 @@ def is_extension_validation_pass(counts: dict[str, int]) -> bool:
 
     ``skipped`` is allowed alongside a real pass: ``@future`` / image-incompatible
     scenarios are legitimately not run.  This is intentionally stricter than
-    ``e2e_summary.is_success``, which scores an all-skipped or empty run green.
+    ``e2e_summary.is_success``, which scores an all-skipped run green.
     """
     return counts.get("passed", 0) > 0 and not _non_success_counts(counts)
 
