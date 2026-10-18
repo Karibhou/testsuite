@@ -20,6 +20,9 @@
 #       suite: smoke
 #
 # The action writes results to ./results/ and vm-serial.log in the workspace.
+# For most suites the caller decides pass/fail from the behave-rc output; for
+# suite: extensions the action itself fails the job via the mandatory
+# extension-validation gate (scripts/extension_validation.py).
 # Artifact upload is deliberately left to the caller workflow.
 
 name: 'GNOME E2E Tests'
@@ -53,7 +56,9 @@ inputs:
 
 outputs:
   behave-rc:
-    description: 'Exit code from behave (0 = all passed)'
+    description: >
+      Exit code from behave (0 = all passed). For suite: extensions the
+      action additionally fails the job via the extension-validation gate.
     value: ${{ steps.run.outputs.behave_rc }}
   results-path:
     description: 'Workspace-relative path to the results directory'
