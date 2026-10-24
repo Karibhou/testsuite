@@ -1,12 +1,12 @@
 {
   "id": "36210509858",
-  "timestamp": "2026-10-24T18:08:03Z",
+  "timestamp": "2026-10-24T19:21:31Z",
   "stream": "testing",
   "flavor": "bluefin",
   "suite": "vanilla-gnome",
   "version": "40.latest",
   "git_commit": {
-    "sha": "94d9d73b105bd87e8ba9c672441f139171da2b93",
+    "sha": "95c6099186ab58876eb8e274ba5f966a3631d119",
     "message": "E2E test run compiled via projectbluefin/bluefin",
     "author": "KubeVirt Lab",
     "repo_url": "https://github.com/projectbluefin/bluefin"
@@ -33,14 +33,14 @@
   "tests": [
     {
       "name": "GNOME 51 accessibility gsettings round-trips > Reduced-motion setting round-trips through gsettings",
-      "status": "failed",
+      "status": "skipped",
       "duration_ms": 0,
       "error_message": null,
       "logs": "[SKIPPED] * Run and save command output: \"gsettings set org.gnome.desktop.a11y.interface reduced-motion reduce\"\n[SKIPPED] * Return code of last command output \"is\" \"0\"\n[SKIPPED] * Run and save command output: \"gsettings get org.gnome.desktop.a11y.interface reduced-motion\"\n[SKIPPED] * Last command output stripped \"is\" \"reduce\"\n[SKIPPED] * Run and save command output: \"gsettings set org.gnome.desktop.a11y.interface reduced-motion no-preference\"\n[SKIPPED] * Return code of last command output \"is\" \"0\"\n[SKIPPED] * Run and save command output: \"journalctl -b --no-pager -p err -g 'at-spi|orca|accessibility' -q | grep -v '^--' | grep -v '^$' | wc -l\"\n[SKIPPED] * Last command output stripped \"is\" \"0\""
     },
     {
       "name": "GNOME 51 accessibility gsettings round-trips > Keyboard focus-visible timeout round-trips through gsettings",
-      "status": "failed",
+      "status": "skipped",
       "duration_ms": 0,
       "error_message": null,
       "logs": "[SKIPPED] * Run and save command output: \"gsettings set org.gnome.desktop.a11y.interface keyboard-focus-visible-timeout 5\"\n[SKIPPED] * Return code of last command output \"is\" \"0\"\n[SKIPPED] * Run and save command output: \"gsettings get org.gnome.desktop.a11y.interface keyboard-focus-visible-timeout\"\n[SKIPPED] * Last command output stripped \"is\" \"5\"\n[SKIPPED] * Run and save command output: \"gsettings set org.gnome.desktop.a11y.interface keyboard-focus-visible-timeout -1\"\n[SKIPPED] * Return code of last command output \"is\" \"0\"\n[SKIPPED] * Run and save command output: \"journalctl -b --no-pager -p err -g 'at-spi|orca|accessibility' -q | grep -v '^--' | grep -v '^$' | wc -l\"\n[SKIPPED] * Last command output stripped \"is\" \"0\""
@@ -133,23 +133,8 @@
       "name": "Vanilla GNOME baseline smoke tests > Bluefin-specific extensions are absent on vanilla-gnome",
       "status": "failed",
       "duration_ms": 296,
-      "error_message": [
-        "ASSERT FAILED: Unexpected Bluefin-specific extension 'bazaar-integration' is present in vanilla-gnome: unsafe-mode@bluefin-test",
-        "appindicatorsupport@rgcjonas.gmail.com",
-        "apps-menu@gnome-shell-extensions.gcampax.github.com",
-        "bazaar-integration@kolunmi.github.io",
-        "blur-my-shell@aunetx",
-        "caffeine@patapon.info",
-        "custom-command-list@storageb.github.com",
-        "dash-to-dock@micxgx.gmail.com",
-        "gradia-integration@alexandervanhee.github.io",
-        "gsconnect@andyholmes.github.io",
-        "launch-new-instance@gnome-shell-extensions.gcampax.github.com",
-        "places-menu@gnome-shell-extensions.gcampax.github.com",
-        "search-light@icedman.github.com",
-        "window-list@gnome-shell-extensions.gcampax.github.com"
-      ],
-      "logs": "[FAILED] * Bluefin-specific extensions are absent on vanilla-gnome\n\u001b[1;31m[ERROR] [\"ASSERT FAILED: Unexpected Bluefin-specific extension 'bazaar-integration' is present in vanilla-gnome: unsafe-mode@bluefin-test\", 'appindicatorsupport@rgcjonas.gmail.com', 'apps-menu@gnome-shell-extensions.gcampax.github.com', 'bazaar-integration@kolunmi.github.io', 'blur-my-shell@aunetx', 'caffeine@patapon.info', 'custom-command-list@storageb.github.com', 'dash-to-dock@micxgx.gmail.com', 'gradia-integration@alexandervanhee.github.io', 'gsconnect@andyholmes.github.io', 'launch-new-instance@gnome-shell-extensions.gcampax.github.com', 'places-menu@gnome-shell-extensions.gcampax.github.com', 'search-light@icedman.github.com', 'window-list@gnome-shell-extensions.gcampax.github.com']\u001b[0m"
+      "error_message": "ASSERT FAILED: Unexpected Bluefin-specific extension 'bazaar-integration' is present in vanilla-gnome: unsafe-mode@bluefin-test\nappindicatorsupport@rgcjonas.gmail.com\napps-menu@gnome-shell-extensions.gcampax.github.com\nbazaar-integration@kolunmi.github.io\nblur-my-shell@aunetx\ncaffeine@patapon.info\ncustom-command-list@storageb.github.com\ndash-to-dock@micxgx.gmail.com\ngradia-integration@alexandervanhee.github.io\ngsconnect@andyholmes.github.io\nlaunch-new-instance@gnome-shell-extensions.gcampax.github.com\nplaces-menu@gnome-shell-extensions.gcampax.github.com\nsearch-light@icedman.github.com\nwindow-list@gnome-shell-extensions.gcampax.github.com",
+      "logs": "[FAILED] * Bluefin-specific extensions are absent on vanilla-gnome\n\u001b[1;31m[ERROR] ASSERT FAILED: Unexpected Bluefin-specific extension 'bazaar-integration' is present in vanilla-gnome: unsafe-mode@bluefin-test\nappindicatorsupport@rgcjonas.gmail.com\napps-menu@gnome-shell-extensions.gcampax.github.com\nbazaar-integration@kolunmi.github.io\nblur-my-shell@aunetx\ncaffeine@patapon.info\ncustom-command-list@storageb.github.com\ndash-to-dock@micxgx.gmail.com\ngradia-integration@alexandervanhee.github.io\ngsconnect@andyholmes.github.io\nlaunch-new-instance@gnome-shell-extensions.gcampax.github.com\nplaces-menu@gnome-shell-extensions.gcampax.github.com\nsearch-light@icedman.github.com\nwindow-list@gnome-shell-extensions.gcampax.github.com\u001b[0m"
     }
   ]
 }
