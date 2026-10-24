@@ -240,14 +240,14 @@ def _wait_for_window(
             last_frames = [(_name(frame), _role(frame)) for frame in frames]
             for frame in frames:
                 name = _name(frame)
-                if (not window_names or name in window_names or "~" in name or "@" in name) and monotonic() <= deadline:
+                if not window_names or name in window_names or "~" in name or "@" in name:
                     return frame
 
         if title_fallback and monotonic() < deadline:
             frames = tree.root.findChildren(_is_visible_frame)
             last_title_frames = [(_name(frame), _role(frame)) for frame in frames[:20]]
             for frame in frames:
-                if _name(frame) in window_names and monotonic() <= deadline:
+                if _name(frame) in window_names:
                     return frame
 
         remaining = deadline - monotonic()

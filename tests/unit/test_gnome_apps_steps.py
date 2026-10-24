@@ -359,3 +359,24 @@ class TestWindowDeadline:
 
         assert m._wait_for_window(m.FILES_APP_NAMES, {"Home"}, "Files", timeout=0.75) is frame
         assert clock.now - 100.0 == 0.5
+
+    @pytest.mark.parametrize("fallback", [False, True])
+    def test_match_found_by_traversal_straddling_deadline_is_returned(self, clock, fallback):
+        m, clock = clock
+        frame = types.SimpleNamespace(roleName="frame", showing=True, name="Home")
+
+        def slow_find(pred):
+            clock.advance(0.3)
+            return [frame] if pred(frame) else []
+
+        app = MagicMock()
+        app.name = "Files"
+        if fallback:
+            m.tree.root.applications.return_value = []
+            m.tree.root.findChildren.side_effect = slow_find
+        else:
+            app.findChildren.side_effect = slow_find
+            m.tree.root.applications.return_value = [app]
+        wait = m._wait_for_window_or_title if fallback else m._wait_for_window
+
+        assert wait(m.FILES_APP_NAMES, {"Home"}, "Files", timeout=0.25) is frame
