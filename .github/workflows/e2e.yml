@@ -590,10 +590,14 @@ jobs:
               "${BFT_UID}" "${BFT_UID}" | \
               sudo tee "${DEP}/etc/tmpfiles.d/ci-user.conf"
 
-            # Passwordless sudo for test operations
+            # Passwordless sudo for test operations. sudoers.d is read in
+            # lexical order and the last matching rule wins: freedesktop-sdk
+            # images (Dakota, GNOME OS) ship %wheel ALL=(ALL) ALL as
+            # sudoers.d/wheel, and bluefin-test is in wheel, so this file must
+            # sort after "wheel" or sudo asks for a password over SSH.
             printf 'bluefin-test ALL=(ALL) NOPASSWD:ALL\n' | \
-              sudo tee "${DEP}/etc/sudoers.d/bluefin-test"
-            sudo chmod 440 "${DEP}/etc/sudoers.d/bluefin-test"
+              sudo tee "${DEP}/etc/sudoers.d/zz-bluefin-test"
+            sudo chmod 440 "${DEP}/etc/sudoers.d/zz-bluefin-test"
 
             # Pre-bake GDM autologin
             sudo mkdir -p "${DEP}/etc/gdm"
@@ -1879,7 +1883,7 @@ jobs:
 
       - name: Upload results artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: e2e-results-${{ steps.artifact-metadata.outputs.artifact_suffix }}-${{ env.SUITE }}
           path: results/
@@ -1888,7 +1892,7 @@ jobs:
 
       - name: Upload serial log artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: vm-serial-log-${{ steps.artifact-metadata.outputs.artifact_suffix }}-${{ env.SUITE }}
           path: vm-serial.log
@@ -1916,7 +1920,7 @@ jobs:
 
       - name: Upload e2e metadata
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: e2e-metadata-${{ steps.artifact-metadata.outputs.artifact_suffix }}-${{ matrix.suite }}
           path: meta/e2e-metadata.json

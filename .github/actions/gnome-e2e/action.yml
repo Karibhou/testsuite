@@ -227,8 +227,8 @@ runs:
           sudo tee "${D}/etc/ssh/sshd_config.d/99-bluefin-test.conf"
 
         echo 'bluefin-test ALL=(ALL) NOPASSWD:ALL' | \
-          sudo tee "${D}/etc/sudoers.d/bluefin-test"
-        sudo chmod 440 "${D}/etc/sudoers.d/bluefin-test"
+          sudo tee "${D}/etc/sudoers.d/zz-bluefin-test"
+        sudo chmod 440 "${D}/etc/sudoers.d/zz-bluefin-test"
 
         sudo mkdir -p "${D}/etc/gdm"
         printf '[daemon]\nAutomaticLoginEnable=True\nAutomaticLogin=bluefin-test\n' | \
@@ -436,6 +436,7 @@ runs:
             is_success      = e2e_summary.is_success
             summary_icon    = e2e_summary.summary_icon
             load_report     = e2e_summary.load_report
+            error_text      = e2e_summary.error_text
         except Exception as exc:
             # Fail closed rather than render a headline we cannot justify, and
             # catch broadly on purpose: exec_module runs the module's top level,
@@ -486,7 +487,7 @@ runs:
                     result = step.get("result", {})
                     if result.get("status") == "failed":
                         failed_step = step.get("name", "")
-                        error_msg  = result.get("error_message", "")
+                        error_msg  = error_text(result.get("error_message"))
                         break
                 failures.append((feature_name, scenario_name, failed_step, error_msg))
 

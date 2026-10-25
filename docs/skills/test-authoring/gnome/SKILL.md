@@ -1,7 +1,7 @@
 ---
 name: gnome
-version: "1.1"
-last_updated: "2026-09-16"
+version: "1.2"
+last_updated: "2026-10-01"
 id: gnome
 one_line_purpose: Write GNOME Shell, AT-SPI, and dogtail interaction tests.
 entry_point: docs/skills/test-authoring/gnome/SKILL.md
@@ -9,7 +9,7 @@ category: test-authoring
 mcp_compliance_level: partial
 status: active
 dependencies: []
-tags: [gnome, atspi, dogtail, gnome-51]
+tags: [gnome, atspi, dogtail, gnome-51, extensions, overview, helper-fault-injection]
 description: "How to write GNOME Shell / AT-SPI / dogtail tests for the testsuite repo. Load when editing GNOME interaction steps."
 metadata:
   type: pattern
@@ -160,7 +160,7 @@ In GNOME 50:
 In GNOME 50, Firefox exposes its top-level window as `filler` or `frame` in AT-SPI, while web content and iframes within tabs also expose nested `frame` nodes (often containing child widgets such as `push button`). When tabs crash under containerized or headless environments, Firefox may also spawn `Tab crash reporter — Mozilla Firefox` frame nodes in the AT-SPI tree.
 
 To resolve the genuine browser window reliably:
-1. Query registered application name as `"Firefox"` first in `FIREFOX_APP_NAMES` to avoid a 10s retry timeout against `"firefox"`.
+1. Resolve the app with `_firefox_app()`, which first scans the live `tree.root.applications()` list matching `FIREFOX_APP_NAMES` case-insensitively, then falls back to per-name `tree.root.application()` lookups, polling until a short elapsed-time deadline (3 s by default). Keep `"Firefox"` (the name GNOME 50 registers) first in `FIREFOX_APP_NAMES` so the fallback lookup hits on its first attempt.
 2. Filter out Mozilla crash reporter windows (`"crash reporter" in name.lower()`) so stale or crashed frames carrying a `page tab list` are not misidentified as browser windows.
 3. Prioritize top-level candidates (`app.children`) before recursive searching, and require genuine browser chrome: `combo box`, `entry`, `autocomplete`, or `page tab list`. In GNOME 50, the Firefox address bar exposes role `combo box` (name `"Search with Google or enter address"`), and buttons use role `button`.
 4. In headless Wayland container environments where `/dev/uinput` evdev keystrokes are not routed to windows by the compositor, provide an AT-SPI fallback via `atspi_click` targeting the `"Open a new tab (Ctrl+T)"` and tab `"Close tab"` buttons.
@@ -246,8 +246,8 @@ runner container over SSH.
 
 Bluefin's 9 bundled extensions each get a named scenario in
 `tests/smoke/features/bluefin_extensions.feature`. Tag the
-`search-light@icedman.github.com` scenario with `@bluefin` so dakota smoke runs
-skip it via `environment.py`.
+`search-light@icedman.github.com` scenario `@bluefin` and guard it with
+`... is installed, otherwise skip on GNOME 51+` (missing on older shells fails).
 
 Use the distinct step phrase `GNOME extension "{uuid}" is enabled` (not
 bazzite's `Extension "{uuid}" is enabled`) to avoid cross-suite step collisions.
@@ -348,7 +348,7 @@ FIREFOX_A11Y_ENV = {
 context.firefox_launch_target = launch_background(FIREFOX_LAUNCH_TARGETS, env=FIREFOX_A11Y_ENV)
 ```
 
-`launch_background(targets, env=...)` in `tests/smoke/features/steps/app_support.py`
+`launch_background(targets, env=...)` in `tests/shared/app_support.py`
 applies `env` on every launch path: exported before the command in SSH mode,
 merged into `os.environ` for local `Popen`, and forwarded across the Flatpak
 sandbox boundary with `--env=`. Environment set outside a Flatpak sandbox is
@@ -392,7 +392,7 @@ Unconditional `sleep(N)` calls inflate suite time — avoid them. Rules:
 
 1. **`launch_background()` from qecore** — do NOT add `sleep(1)` after calling qecore's built-in `launch_background()`. The immediately-following "window is accessible" step has its own AT-SPI polling loop; the launch sleep is redundant there.
 
-   **EXCEPTION — `_launch_app()` custom launcher**: The suite-local `_launch_app()` in `gnome_apps_steps.py` uses D-Bus app activation (`gio open` or `gtk-launch`), which is **asynchronous**. `sleep(1)` after a successful `_launch_app()` return is **required** as a D-Bus activation settle time — without it, `_wait_for_window()` starts polling before the process has registered with the AT-SPI accessibility bus, exhausts all retries (~10s), and fails on slower images (e.g. Dakota testing). Do not remove this sleep. The regression in PR #465 was caused by removing it.
+   **EXCEPTION — `_launch_app()` custom launcher**: The suite-local `_launch_app()` in `gnome_apps_steps.py` uses D-Bus app activation (`gio open` or `gtk-launch`), which is **asynchronous**. `sleep(1)` after a successful `_launch_app()` return is **required** as a D-Bus activation settle time — without it, `_wait_for_window()` starts polling before the process has registered with the AT-SPI accessibility bus, exhausts its 15 s elapsed-time deadline, and fails on slower images (e.g. Dakota testing). Do not remove this sleep. The regression in PR #465 was caused by removing it.
 
 2. **Polling loop intervals** — use 0.2s intervals in retry loops (`for _ in range(N): sleep(0.2)`). 0.5s is the old default; the loops already exit-early on success so tighter intervals help.
 
@@ -405,7 +405,6 @@ Unconditional `sleep(N)` calls inflate suite time — avoid them. Rules:
 The pattern `for _ in range(N): ... sleep(X)` that returns early already IS exit-early. The gains come from removing the PRECEDING unconditional sleep, not from changing the loop.
 
 ## Red Flags
-
 
 - Using `'true' in out` to check a Shell.Eval result (success_bool is always true)
 - Calling `Shell.Eval` without first setting `global.context.unsafe_mode = true`
@@ -422,7 +421,6 @@ The pattern `for _ in range(N): ... sleep(X)` that returns early already IS exit
 - A session-readiness loop caches the D-Bus session address or treats a missing bus socket as fatal (breaks across the qecore-headless GDM restart)
 
 ## Verification
-
 
 - [ ] Shell.Eval results extracted with `_eval_bool()` / regex on second tuple element, never `'true' in out`
 - [ ] `unsafe_mode=true` set before any Shell.Eval that reads protected state
@@ -442,14 +440,12 @@ The pattern `for _ in range(N): ... sleep(X)` that returns early already IS exit
 
 ## Red Flags
 
-
 - New smoke app steps hardcode `/usr/share/applications/...` for Flatpak-only apps
 - Step code uses `findChild(..., requireResult=...)`
 - New GNOME steps duplicate existing step phrases in the suite
 - New launch steps add unconditional post-launch sleeps instead of relying on accessibility polling
 
 ## Verification
-
 
 - [ ] Reused existing GNOME/smoke helpers before adding new ones
 - [ ] Launch targets prefer desktop files, with Flatpak or command fallback only when needed
@@ -498,3 +494,7 @@ Load these when you hit the specific topic:
 - [MIME, display, and session configuration in containerized tests.](references/display-config.md)
 - [Deep dive: Preinstalled Flatpak desktop app launch checks](references/preinstalled-flatpak-desktop-app-launch-checks.md)
 - [GNOME 50 workaround audit against GNOME 51 (issue #827)](references/gnome-51-audit.md)
+
+## Overview, clone paint, and helper fault injection (issue #919)
+
+Drive the overview via `Shell.Eval` plus a teardown entry; the clone paint proof requires the original to keep the effect while the clone owns none. Helper-driven extensions exercise the JS error branch via `installed_path(info)` plus a `<helper>.py.test-backup` swap. The owned-process assertion lives in `tests.shared.guest_owned_processes`; `assert_no_guest_owned_processes(context, ("needle",))` walks `/proc` from inside the guest because a host `pgrep` cannot distinguish a leaked subprocess from unrelated host processes. The script body is exposed as `WALKER_SCRIPT` so `tests/unit/test_guest_owned_processes_walker.py` can compile it and pin the argv shape (`ExtensionSession.command` runs `subprocess.run` without a shell — passing the script as a single argv element to `python3 -c` is mandatory).

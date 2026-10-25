@@ -39,6 +39,8 @@ SETTINGS_LAUNCH_TARGETS = (
     ("desktop", "org.gnome.Settings.desktop"),
 )
 TEXT_ROLES = {"heading", "label", "static", "text", "description", "paragraph"}
+# Provider titles GNOME Online Accounts lists; none appear in the Settings sidebar.
+GOA_PROVIDER_LABELS = ("Google", "Nextcloud", "Microsoft", "Email Server", "WebDAV", "Kerberos")
 INFO_TOKENS = ("bluefin", "fedora", "linux", "version", "os")
 SETTINGS_PANEL_ALIASES = {
     "About": ("About", "System"),
@@ -120,11 +122,10 @@ def launch_settings_via_command(context) -> None:
     # via gio will start a new instance that properly registers.
     from app_support import _IN_CONTAINER, _ssh_run
     if _IN_CONTAINER:
-        # Use exact-name pgrep to avoid killing unrelated processes.
+        # Use exact-name pkill to avoid killing unrelated processes.
         # pkill -f with a broad pattern can crash the GNOME session on GNOME 50.
         _ssh_run(
-            "pid=$(pgrep -x gnome-control-center 2>/dev/null); "
-            "[ -n \"$pid\" ] && kill -TERM \"$pid\" 2>/dev/null; sleep 0.5; true",
+            "pkill -TERM -x gnome-control-c 2>/dev/null; sleep 0.5; true",
             timeout=5,
         )
     else:
@@ -227,25 +228,23 @@ def settings_sidebar_is_present(context) -> None:
 
 @step('Navigate to Settings panel "{name}"')
 def navigate_to_settings_panel(context, name: str) -> None:
-    from app_support import _IN_CONTAINER, _ssh_run
+    from app_support import _IN_CONTAINER, _ssh_launch, _ssh_run
     # Use gnome-control-center <panel-id> for direct D-Bus activation — this is more
     # reliable than AT-SPI sidebar clicks, especially in the runner container where
     # Wayland input injection via ponytail is unavailable.
     panel_id = SETTINGS_PANEL_IDS.get(name, name.lower().replace(" ", "-").replace("&", "and"))
     if _IN_CONTAINER:
         # Kill any existing instance first so the new launch opens on the correct panel.
+        # -x matches the kernel comm, truncated to 15 chars ("gnome-control-c");
+        # the full name never matched, so the old window kept its previous panel.
         _ssh_run(
-            "pid=$(pgrep -x gnome-control-center 2>/dev/null); "
-            "[ -n \"$pid\" ] && kill -TERM \"$pid\" 2>/dev/null; sleep 0.5; true",
+            "pkill -TERM -x gnome-control-c 2>/dev/null; sleep 0.5; true",
             timeout=5,
         )
-        # Launch gnome-control-center with the panel ID directly.
-        # gnome-control-center interprets the first positional arg as the panel name.
-        _ssh_run(
-            f"source /tmp/session.env 2>/dev/null; "
-            f"gnome-control-center {panel_id} &",
-            timeout=5,
-        )
+        # Launch gnome-control-center with the panel ID directly, detached and with
+        # the a11y env (as "Launch Settings via command" does): a bare "&" over SSH
+        # dies with the session and never registers on AT-SPI.
+        _ssh_launch(f"gnome-control-center {panel_id}", SETTINGS_A11Y_ENV)
     else:
         try:
             if shutil.which("pkill"):
@@ -303,34 +302,23 @@ def about_page_shows_system_information(context) -> None:
     )
 
 
-def _ancestor_with_name(node, name: str, max_depth: int = 8):
-    """Return the first ancestor of ``node`` whose name matches ``name``."""
-    current = getattr(node, "parent", None)
-    depth = 0
-    while current and depth < max_depth:
-        if (getattr(current, "name", "") or "").strip() == name:
-            return current
-        current = getattr(current, "parent", None)
-        depth += 1
-    return None
-
-
 @step("Online Accounts provider list is non-empty")
 def online_accounts_provider_list_is_non_empty(context) -> None:
+    # Match provider labels anywhere in the showing tree: libadwaita rows do not
+    # sit under an ancestor named "Online Accounts" and may carry the title on a
+    # child label rather than the row, so a role+ancestor query finds nothing
+    # even when the panel lists every provider. No sidebar entry contains these.
     app = _settings_app()
-    panel_name = "Online Accounts"
-    provider_roles = {"list item", "row", "table row"}
     for _ in range(20):
-        rows = app.findChildren(
-            lambda n: n.showing
-            and n.roleName in provider_roles
-            and (n.name or "").strip()
-            and _ancestor_with_name(n, panel_name) is not None
-        )
-        if rows:
-            context.online_accounts_providers = [
-                (n.name or "").strip() for n in rows
-            ]
+        names = {
+            (n.name or "").strip()
+            for n in app.findChildren(
+                lambda n: n.showing
+                and any(p in (n.name or "") for p in GOA_PROVIDER_LABELS)
+            )
+        }
+        if names:
+            context.online_accounts_providers = sorted(names)
             return
         sleep(0.5)
     raise AssertionError(

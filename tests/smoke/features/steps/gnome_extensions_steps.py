@@ -154,11 +154,10 @@ def gnome_extension_is_enabled(context, uuid: str) -> None:
         "Expected state=1 (ENABLED)."
     )
 
-@step('GNOME extension "{uuid}" is installed')
-def gnome_extension_is_installed(context, uuid: str) -> None:
+def _extension_installed(uuid: str) -> bool:
     output, returncode, _ = _run_host(["gnome-extensions", "list"])
     if returncode == 0 and uuid in [line.strip() for line in output.splitlines()]:
-        return
+        return True
 
     out, rc, _ = _run_host(
         "source /tmp/session.env 2>/dev/null; "
@@ -166,11 +165,45 @@ def gnome_extension_is_installed(context, uuid: str) -> None:
         "--method org.gnome.Shell.Extensions.ListExtensions"
     )
     if rc == 0 and out and uuid in re.findall(r"'([^'@]+@[^']+)':", out):
-        return
+        return True
 
     # Fallback to filesystem check in /usr/share/gnome-shell/extensions
-    dest_out, dest_rc, _ = _run_host(f"test -d /usr/share/gnome-shell/extensions/{uuid}")
-    assert dest_rc == 0, f"Extension {uuid!r} is not installed in the system"
+    _, dest_rc, _ = _run_host(f"test -d /usr/share/gnome-shell/extensions/{uuid}")
+    return dest_rc == 0
+
+
+@step('GNOME extension "{uuid}" is installed')
+def gnome_extension_is_installed(context, uuid: str) -> None:
+    assert _extension_installed(uuid), f"Extension {uuid!r} is not installed in the system"
+
+
+def _gnome_shell_major_version() -> int | None:
+    out, rc, _ = _run_host(
+        "source /tmp/session.env 2>/dev/null; "
+        "gnome-shell --version 2>/dev/null || mutter --version 2>/dev/null"
+    )
+    if rc != 0 or not out:
+        return None
+    match = re.search(r"(\d+)\.\d+", out)
+    return int(match.group(1)) if match else None
+
+
+@step('GNOME extension "{uuid}" is installed, otherwise skip on GNOME {min_major:d}+')
+def gnome_extension_installed_or_skip(context, uuid: str, min_major: int) -> None:
+    # For extensions an image deliberately stops shipping from a given GNOME
+    # release, e.g. Search Light, which is broken on GNOME 51. Absence on older
+    # (or undetectable) shells is still a failure, so regressions are caught.
+    if _extension_installed(uuid):
+        return
+    major = _gnome_shell_major_version()
+    if major is not None and major >= min_major:
+        context.scenario.skip(f"{uuid} is not shipped on GNOME {major}")
+        return
+    shell = f"GNOME {major}" if major is not None else "unknown GNOME version"
+    raise AssertionError(
+        f"Extension {uuid!r} is not installed on {shell} "
+        f"(only expected to be absent on GNOME {min_major}+)"
+    )
 
 
 @step('Dconf path "{path}" has value "{expected_value}"')
