@@ -155,7 +155,7 @@ the checkout's namespace package whatever `sys.path` says, forcing the fail-clos
 path. That load catches bare `Exception` on purpose — `exec_module` runs the module's top level, so a corrupted
 copy raises `SyntaxError` or anything else, and this reporting-only step must exit 0 rather than fail the job.
 
-**Gate extension-validation run** follows `Summarise results` for `suite: extensions`: it loads the sibling results helper by file path and requires at least one passing scenario with no errors, while emitting a JSON report for either verdict.
+**Gate extension-validation run** follows `Summarise results` for `suite: extensions`: it loads the sibling results helper by file path and requires at least one passing scenario with no errors, while emitting a JSON report for either verdict. Earlier, before boot, the install step runs `scripts/guest_preflight.py` over the mounted deployment: it writes `results/guest-provenance.json` (image ref, resolved digest, guest `os-release`) and fails closed when a prerequisite such as `gnome-ponytail-daemon` is missing.
 
 ## Sparse checkout is non-cone — every script must be listed explicitly
 
@@ -497,3 +497,4 @@ Load these when you hit the specific topic:
 - [Installer suite assertions, and why an env-var gate made one unreachable.](references/installer-suite.md)
 - [Migration inputs `migration-target` / `extra-tags` and the startup_failure they cause when missing.](references/migration-inputs.md)
 - [GNOME OS guest lane for the developer extension-validation service and its mandatory gate.](references/gnome-extensions-validation.md)
+- [GNOME OS image provenance (2-week tag expiry), verified guest inventory, and the extensions pre-boot preflight](references/gnomeos-guest-provenance.md)
