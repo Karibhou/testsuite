@@ -79,7 +79,7 @@ action hands `inputs.image` verbatim to `podman pull` / `bootc install`.
 - uses: ./.github/actions/gnome-e2e
   with:
     # requires an image that carries gnome-ponytail-daemon (blocker 1 above);
-    # a digest resolved at dispatch time — gnomeos-* digests expire after 2 weeks
+    # digest from a not-yet-written `resolve` job (sketch: gnomeos-guest-provenance.md); expires in 2 weeks
     image: quay.io/gnome_infrastructure/gnome-build-meta@${{ needs.resolve.outputs.digest }}
     suite: extensions   # uses tests/extensions/ (landed with #914)
 ```

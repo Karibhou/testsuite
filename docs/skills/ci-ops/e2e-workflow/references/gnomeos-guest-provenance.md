@@ -38,6 +38,24 @@ curl -sI -H "Authorization: Bearer $TOKEN" \
 # or: skopeo inspect docker://quay.io/gnome_infrastructure/gnome-build-meta:gnomeos-nightly | jq -r .Digest
 ```
 
+### Resolving the digest in a workflow
+
+No workflow does this yet. A sketch of a `resolve` job whose output feeds the `gnome-e2e`
+`image:` input (the e2e job declares `needs: resolve`):
+
+```yaml
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.digest.outputs.digest }}
+    steps:
+      - id: digest
+        run: |
+          d=$(skopeo inspect docker://quay.io/gnome_infrastructure/gnome-build-meta:gnomeos-nightly | jq -r .Digest)
+          echo "digest=$d" >> "$GITHUB_OUTPUT"
+```
+
 ## Guest inventory (verified against the image, not booted)
 
 Inventoried 2026-10-27 from `gnomeos-nightly` @ `sha256:9dd3a858…e824c`
