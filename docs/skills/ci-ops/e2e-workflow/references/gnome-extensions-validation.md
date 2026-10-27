@@ -71,7 +71,7 @@ behaviour features plus a cross-cutting `extension_lifecycle.feature`.
 
 `gnome-e2e` is not a boot-only action: the same invocation provisions the guest **and** runs
 `tests/<suite>/features/` inside it under `qecore-headless` (`action.yml:384`). `suite` must
-therefore be set — it defaults to `smoke` (`action.yml:35-37`), which would boot GNOME OS and run
+therefore be set — it defaults to `smoke` (`action.yml:40-42`), which would boot GNOME OS and run
 the **Bluefin** smoke suite, testing the wrong thing. Pass a **digest resolved at dispatch time**, not a tag: the
 action hands `inputs.image` verbatim to `podman pull` / `bootc install`.
 
