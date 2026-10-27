@@ -231,7 +231,6 @@ Why the `@pending`/`@future` scenarios above cannot run today.
 
 | Scenario | Suite | Tag | Blocked by |
 |---|---|---|---|
-| MIME defaults PDF/PNG/video (×3) | smoke | `@pending` | Fedora system mimeapps.list sets Firefox as default; Flatpak apps don't override at system level (#529) |
 | flatpak_permissions system-wide installs (×39) | smoke | `@pending` | `flatpak-preinstall.service` masked in `e2e.yml` and `/var/lib/flatpak` never seeded |
 | common flatpak model/state (×4) | common | `@pending` | flatpak-preinstall.service masked in CI; /var not preserved from OCI build |
 | common dconf (×4) | common | `@pending` | gsettings/dconf schema defaults; Ptyxis palette is user-session state |
