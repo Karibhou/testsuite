@@ -147,6 +147,39 @@ class TestValidFedoraVersion:
         assert self.mod._valid_fedora_version(version) is False
 
 
+class TestUpgradeOutputStaged:
+    """The upgrade-staged step is a mandatory qualification gate: a no-op
+    upgrade must fail hard, not skip, so a run cannot pass without exercising
+    a real upgrade to a distinct candidate digest."""
+
+    def setup_method(self):
+        self.mod = _import_lifecycle_steps()
+
+    def test_passes_when_a_new_image_was_queued(self):
+        context = MagicMock(command_stdout="Queued for next boot: sha256:aaaa")
+
+        # Must not raise — a real upgrade was staged.
+        self.mod.upgrade_output_staged(context)
+
+    def test_fails_when_no_update_available(self):
+        context = MagicMock(command_stdout="No update available.")
+
+        with pytest.raises(AssertionError, match="no-op"):
+            self.mod.upgrade_output_staged(context)
+
+    def test_fails_when_output_is_empty(self):
+        context = MagicMock(command_stdout="")
+
+        with pytest.raises(AssertionError, match="no-op"):
+            self.mod.upgrade_output_staged(context)
+
+    def test_failure_message_names_the_bootc_output(self):
+        context = MagicMock(command_stdout="Already up to date.")
+
+        with pytest.raises(AssertionError, match="Already up to date."):
+            self.mod.upgrade_output_staged(context)
+
+
 class TestIsDeploymentSettled:
     def setup_method(self):
         self.mod = _import_lifecycle_steps()

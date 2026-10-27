@@ -68,6 +68,31 @@ expected_upgrade_digest = get_staged_digest(context)
 
 Without step 3, the post-reboot assertion has nothing to compare against and silently passes or skips.
 
+## Upgrade-staged is a mandatory qualification gate
+
+The step **`bootc upgrade output indicates image was staged`** (in
+`tests/lifecycle/features/steps/steps.py`) is the gate that stops a run from
+passing without doing an upgrade. `bootc upgrade` exits 0 in two cases: it
+stages a new image (output contains `Queued for next boot: <ref>`), or it is a
+no-op (output contains `No update available.`).
+
+This step must **fail** on a no-op, not skip it. The upgrade/rollback lifecycle
+scenarios call it to prove a real change: the booted digest must move to a
+staged candidate, and rollback must later restore the original. If the step
+skipped on a no-op, a run could report a passing upgrade path while exercising
+neither upgrade nor rollback.
+
+The only scenario that legitimately gets a no-op is `@upgrade @idempotent`
+("bootc upgrade is idempotent when already at latest"). It never calls this
+step; it uses `If bootc upgrade output indicates image was staged, reboot VM
+and wait for SSH` instead, which reboots only when something was actually
+staged. That distinction — a mandatory step that fails on no-op, versus an
+optional helper that reboots only when staged — is what keeps coverage from
+silently narrowing.
+
+When you need a mandatory step to prove a real change, fail with an
+`AssertionError` that names the observed output; do not `scenario.skip()`.
+
 ## ostree admin status parsing
 
 ```

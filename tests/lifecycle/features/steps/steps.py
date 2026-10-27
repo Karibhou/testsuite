@@ -221,31 +221,31 @@ def active_matches_original(context):
 
 @step("bootc upgrade output indicates image was staged")
 def upgrade_output_staged(context):
-    """Verify bootc upgrade stdout shows a new image was queued for next boot.
+    """Verify bootc upgrade staged a distinct image for the next boot.
 
     ``bootc upgrade`` exits 0 in two distinct cases:
       - New image available: output contains "Queued for next boot: <ref>"
       - Already up-to-date: output contains "No update available."
 
-    When the upgrade is a no-op, any stale staged deployment left over from a
-    prior run would cause reboot-dependent scenarios to false-pass: the stale
-    staged digest matches the booted digest after rebooting into it, /etc files
-    trivially survive a same-image reboot, and ostree still shows two entries.
+    This step is a mandatory qualification gate. The upgrade lifecycle
+    scenarios that call it prove a real upgrade and rollback: the booted
+    digest must change to a staged candidate, and rollback must later restore
+    the original. A no-op upgrade (already at latest) changes nothing, so it
+    must fail here — otherwise the scenario reports a passing upgrade path
+    while exercising neither upgrade nor rollback.
 
-    If no staging happened, fail hard so CI does not silently report a
-    passing upgrade path when no upgrade actually occurred.
+    A no-op is a real, expected condition only for the dedicated idempotency
+    scenario (``@upgrade @idempotent``), which never calls this step and
+    instead uses "If bootc upgrade output indicates image was staged, reboot
+    VM and wait for SSH" to reboot only when something was actually staged.
     """
     output = getattr(context, "command_stdout", "")
     if "Queued for next boot" not in output:
-        # Skip rather than fail: when CI images are already at latest,
-        # bootc upgrade is always a no-op and these upgrade scenarios
-        # can never pass. Skipping the whole scenario avoids persistent
-        # red noise; the migration scenarios still exercise bootc switch.
-        _skip_current_scenario(
-            context,
-            "bootc upgrade was a no-op — booted image is already at the latest digest. "
-            "Skip upgrade-dependent scenarios; use a pinned older digest as the base image "
-            f"to exercise upgrade paths. bootc output: {output!r}",
+        raise AssertionError(
+            "bootc upgrade did not stage a new image — this mandatory lifecycle "
+            "qualification requires a real upgrade to a distinct candidate digest, "
+            "but the upgrade was a no-op. Use a pinned older digest as the base "
+            "image to exercise upgrade paths. bootc output: " + repr(output)
         )
 
 
