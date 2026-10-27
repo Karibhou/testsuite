@@ -166,7 +166,6 @@ NetworkManager state is injected without changing the host's persistent state.
 
 ## MIME type handler verification (smoke suite)
 
-
 Use `xdg-mime query default <mime-type>` to verify handler registration without launching apps. Assert against known `.desktop` file names or an allow-set:
 
 ```python
@@ -272,7 +271,6 @@ the gate goes inert. See
 [the cached-image gate reference](references/cached-image-gate.md).
 
 ## Feature scaffolding with @future
-
 
 Use `@future` when the step implementation isn't ready yet:
 
@@ -391,7 +389,6 @@ This keeps common-suite assertions aligned with how Bluefin actually ships those
 
 ## Quarantine Protocol
 
-
 When a scenario fails in QEMU CI due to a known environment limitation (not a code bug), tag it `@quarantine` and file a tracking issue:
 
 ```gherkin
@@ -413,9 +410,12 @@ The CI runs behave with `--tags ~quarantine`, so quarantined scenarios are skipp
 
 ### Known quarantine categories (2026-06)
 
-**smoke-b:** screen lock (#528), PDF/PNG/video MIME defaults (#529)
+**smoke-b:** screen lock (#528)
 - Screen lock: GNOME 50 headless QEMU — lock screen doesn't engage within 10s
-- MIME defaults: Fedora system mimeapps.list sets Firefox as default; Flatpak Papers/Loupe don't override at system level on fresh install
+
+PDF/PNG/video checks are active after #529: `projectbluefin/common` ships
+`/etc/xdg/mimeapps.list` with Papers/Loupe/Showtime defaults. The video allow-set
+already accepts `org.gnome.Showtime.desktop`; keep these regression checks active.
 
 **common-a/b:** 13 scenarios in dconf, flatpak, immutable, polkit (#531)
 - Flatpak: /var/lib/flatpak not preserved from OCI build; flatpak-preinstall.service masked in CI

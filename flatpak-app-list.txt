@@ -2,3 +2,8 @@
 # Keep this list small so cold-cache warm-up stays cheaper than first-boot installs.
 org.mozilla.firefox
 io.github.kolunmi.Bazaar
+# Default MIME handlers asserted by tests/smoke/features/xdg_open.feature;
+# xdg-mime only resolves a default when the handler's .desktop file exists.
+org.gnome.Papers
+org.gnome.Loupe
+org.gnome.Showtime
