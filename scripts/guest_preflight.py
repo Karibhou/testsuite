@@ -15,8 +15,10 @@ mounted deployment *before* the VM boots and:
 
 Without this gate a missing prerequisite surfaces minutes later as a confusing
 qecore/behave failure (or no results at all) instead of a named provisioning
-error.  Paths are checked with ``os.path.lexists`` and never resolved, so an
-absolute symlink inside the guest tree is never followed onto the host.
+error.  The final path component is checked with ``os.path.lexists`` and never
+resolved, and a hit is discarded when any parent directory resolves outside the
+guest tree, so an absolute symlink inside the guest is never followed onto the
+host.
 
 See ``docs/skills/ci-ops/e2e-workflow/references/gnome-extensions-validation.md``.
 """
@@ -83,12 +85,25 @@ def _has_builtin_uinput(path: Path) -> bool:
     return any(line.rstrip().endswith("/uinput.ko") for line in text.splitlines())
 
 
+def _parents_inside(root: Path, rel: Path) -> bool:
+    """True when every parent directory of *rel* resolves inside *root*.
+
+    ``lexists`` and ``Path.glob`` both traverse symlinked parent directories, so
+    a guest ``usr/lib64 -> /usr/lib`` would otherwise be probed on the host.
+    """
+    base = root.resolve()
+    return all((root / parent).resolve().is_relative_to(base) for parent in rel.parents)
+
+
 def _matches(root: Path, pattern: str) -> list[str]:
     """Return guest-relative paths matching *pattern*, without following links."""
     if not any(ch in pattern for ch in "*?["):
-        return [pattern] if os.path.lexists(root / pattern) else []
+        hit = os.path.lexists(root / pattern) and _parents_inside(root, Path(pattern))
+        return [pattern] if hit else []
     found = []
     for path in sorted(root.glob(pattern)):
+        if not _parents_inside(root, path.relative_to(root)):
+            continue
         if pattern.endswith("modules.builtin") and not _has_builtin_uinput(path):
             continue
         found.append(path.relative_to(root).as_posix())

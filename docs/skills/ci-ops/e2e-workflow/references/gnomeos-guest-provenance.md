@@ -94,5 +94,6 @@ error when any prerequisite above is missing (or the guest has no `os-release`).
 stock GNOME OS on exactly one item, `gnome-ponytail-daemon` — that is the correct, named failure
 in place of a qecore error ten minutes later. It records `is_gnome_os` from `os-release`
 `ID` but does not reject other images, so a Bluefin/Dakota extensions run stays possible and is
-never labelled GNOME OS. Paths are checked with `lexists` and never resolved, so absolute guest
-symlinks are not followed onto the host.
+never labelled GNOME OS. The final path component is checked with `lexists` and never resolved,
+and hits under a parent directory that resolves outside the guest tree are discarded, so
+absolute guest symlinks are not followed onto the host.

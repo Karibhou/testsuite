@@ -140,6 +140,28 @@ def test_dangling_absolute_symlink_counts_and_is_not_followed(tmp_path: Path) ->
     assert check_requirements(root)["gnome-ponytail-daemon"] == ["usr/libexec/gnome-ponytail-daemon"]
 
 
+@pytest.mark.parametrize(
+    ("link", "pattern_hit"),
+    [
+        ("usr/lib64", "usr/lib64/python3.14/site-packages/gi/__init__.py"),
+        ("usr/libexec", "usr/libexec/gnome-ponytail-daemon"),
+    ],
+)
+def test_parent_symlink_escaping_guest_is_not_followed(
+    tmp_path: Path, link: str, pattern_hit: str
+) -> None:
+    root = _make_tree(tmp_path / "guest", [p for p in GNOME_OS_PATHS if not p.startswith(link + "/")])
+    host = tmp_path / "host"
+    target = host / Path(pattern_hit).relative_to(link)
+    target.parent.mkdir(parents=True)
+    target.write_text("")
+    if (root / link).exists():
+        os.rename(root / link, tmp_path / "moved")
+    os.symlink(host, root / link)
+    hits = [h for hits in check_requirements(root).values() for h in hits]
+    assert pattern_hit not in hits
+
+
 def test_missing_os_release_fails_closed(tmp_path: Path) -> None:
     root = _make_tree(tmp_path, GNOME_OS_PATHS + ["usr/libexec/gnome-ponytail-daemon"], os_release=None)
     report = build_report(root)
