@@ -137,10 +137,13 @@ after `extension_lifecycle.feature` to inspect active and enabled state.
 
 ### 4. Gate the run, against the results copied back to the host workspace
 
-> **Not wired yet.** No workflow, Justfile recipe, or `gnome-e2e` action step invokes
-> `scripts/extension_validation.py` at this head — the action's summarise step uses
-> `scripts/e2e_summary.py` only. Today the gate is run by hand against the copied-back
-> `results/`. Wiring it into the lane as the mandatory service gate is a follow-up slice of #908.
+The `gnome-e2e` action runs the gate as its own **mandatory service-gate step**
+(`.github/actions/gnome-e2e/action.yml`, `if: always() && inputs.suite == 'extensions'`):
+a `suite: extensions` run fails the job on any empty / all-skipped / undefined /
+untested / hook-error / failed-boot / missing-result result, regardless of the general
+`scripts/e2e_summary.py` headline (which scores an all-skipped run green). No workflow or
+Justfile recipe in this repo calls the action with `suite: extensions` yet — a consumer
+runs it directly. The command below is still the manual form (re-run after a lab boot):
 
 ```bash
 python3 scripts/extension_validation.py results/results.json; echo $?
@@ -188,8 +191,9 @@ A host socket, key, or mount exposed to the guest desktop is a regression: stop 
 - [x] Guest inventory + four hive extensions documented
 - [x] Mandatory service gate implemented and unit-tested (`scripts/extension_validation.py`)
 - [x] Security posture recorded: guest-local, disposable credentials; no host reach
-- [ ] Gate wired into the lane (no workflow / action step invokes
-      `scripts/extension_validation.py` yet; run by hand today)
+- [x] Gate wired into the lane: `gnome-e2e` runs `scripts/extension_validation.py` as a
+      mandatory step when `suite == 'extensions'` (#991). No repo workflow/recipe calls the
+      action with `suite: extensions` yet — a consumer runs it directly.
 - [ ] Repeatable boot + load + run commands validated in the lab (**unverified**;
       tests/extensions landed with #914; blocked on a `gnome-ponytail-daemon` overlay)
 - [ ] At least one green extension-validation run captured and attached
