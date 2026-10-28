@@ -103,6 +103,15 @@ Current skip conditions:
 The skip is surfaced in the job log, the GitHub Step Summary, and the behave JSON
 output.
 
+A deliberately skipped shard is **not** a product failure. The workflow records
+the skip reason (`KDE_WEBDRIVER_SKIP`) and passes it to the mandatory-coverage
+gate (`scripts/assert_passed.py`) via `--skip-reason`, which treats it as a
+passing terminal state — the job stays green. This is distinct from a suite that
+self-disabled after the webdriver installed: with no skip reason, that run has
+`0 passing scenarios` and the gate fails the job (the false-green route). See
+`docs/skills/test-authoring/kde/references/webdriver-and-locators.md` §"CI
+passed > 0 backstop".
+
 
 ## Supply-chain exception: per-DUT inputsynth
 

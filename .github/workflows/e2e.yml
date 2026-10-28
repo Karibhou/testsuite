@@ -236,7 +236,7 @@ jobs:
             flatpak-app-list.txt
             tests
             scripts/all_skipped.py
-            scripts/assert_kde_passed.py
+            scripts/assert_passed.py
             scripts/check_quarantine_age.py
             scripts/install-kde-webdriver.sh
             scripts/e2e_summary.py
@@ -1911,12 +1911,36 @@ jobs:
         if: steps.run.outputs.behave_rc != '0'
         run: exit "${{ steps.run.outputs.behave_rc }}"
 
-      # Backstop: an all-skipped KDE run must NOT be reported as green.
-      # If the suite silently self-disables (e.g. webdriver not reachable),
-      # CI would stay green with zero real coverage. Assert passed > 0.
-      - name: Assert KDE suite has passing scenarios
-        if: startsWith(env.SUITE_DIR, 'kde') && steps.run.outputs.behave_rc == '0'
-        run: python3 scripts/assert_kde_passed.py results/results.json
+      # Backstop: every desktop suite must have at least one genuinely passing
+      # scenario. behave exits 0 when a setup failure (failed_setup.txt) or a
+      # self-disabled suite skips every scenario, so reading behave_rc alone is a
+      # false green. assert_passed.py is the verdict contract for these suites (the
+      # gnome-e2e action does not call it yet); it fails on the failed_setup marker, an
+      # empty/truncated results.json, or 0 passing scenarios. Optional documented
+      # skips (quarantine/pending/future) never fail it on their own. A
+      # deliberately inapplicable shard (KDE webdriver stack could not be
+      # installed) is passed through --skip-reason and is a passing terminal
+      # state for the gate, not a product failure.
+      - name: Assert desktop suite has passing scenarios
+        if: |
+          (startsWith(env.SUITE_DIR, 'kde') ||
+           env.SUITE_DIR == 'smoke' || env.SUITE_DIR == 'developer' ||
+           env.SUITE_DIR == 'dx' || env.SUITE_DIR == 'software' ||
+           env.SUITE_DIR == 'vanilla-gnome') &&
+          steps.run.outputs.behave_rc == '0'
+        env:
+          # Through env, not inline: the reason embeds strings read from the
+          # image under test (plasmashell --version, /etc/os-release).
+          SKIP_REASON: ${{ steps.kde_webdriver.outputs.skip_reason }}
+        run: |
+          # smoke-firefox skips its only scenario on images that ship Firefox
+          # only as a Flatpak (#924); an all-skipped run is a pass there.
+          ALLOW=()
+          if [[ "${SUITE}" == "smoke-firefox" ]]; then
+            ALLOW=(--allow-all-skipped)
+          fi
+          python3 scripts/assert_passed.py results/results.json \
+            --skip-reason "${SKIP_REASON}" "${ALLOW[@]}"
 
       - name: Write e2e metadata
         if: always()
