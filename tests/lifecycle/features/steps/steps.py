@@ -259,6 +259,88 @@ def upgrade_output_staged(context):
         )
 
 
+def _deployment_digest(deployment):
+    return ((deployment or {}).get("image") or {}).get("imageDigest", "")
+
+
+def _deployment_image(deployment):
+    return ((deployment or {}).get("image") or {}).get("image") or {}
+
+
+def _read_bootc_status(context):
+    stdout, rc = run_ssh(context, "sudo bootc status --format=json")
+    assert rc == 0, f"sudo bootc status --format=json exited {rc}: {stdout!r}"
+    return _parse_bootc_status(context)
+
+
+@step("VM is restored to the pre-upgrade baseline deployment")
+def restore_pre_upgrade_baseline(context):
+    """Return the VM to the state it was in before the first upgrade scenario.
+
+    Lifecycle scenarios share one VM and are not isolated: a scenario that
+    reboots into the upgrade candidate leaves the VM already at latest, so the
+    next scenario's ``bootc upgrade`` would be a no-op and fail the mandatory
+    "bootc upgrade output indicates image was staged" gate. Every scenario
+    that calls that gate starts with this step so each one gets a real upgrade.
+
+    The first call records the baseline: the booted digest plus, if CI
+    pre-staged the candidate via ``bootc switch``, the staged image reference.
+    Later calls roll back (and reboot) when the booted digest has moved off
+    the baseline, then re-stage the recorded candidate reference if the
+    pre-staged deployment is gone.
+    """
+    baseline = getattr(context, "lifecycle_baseline", None)
+    if not isinstance(baseline, dict):
+        baseline = {}
+        context.lifecycle_baseline = baseline
+
+    status = _read_bootc_status(context)
+    booted_digest = _deployment_digest(status.get("booted"))
+    assert booted_digest, f"Could not read booted imageDigest from bootc status: {status}"
+
+    if not baseline.get("digest"):
+        staged_image = _deployment_image(status.get("staged"))
+        baseline["digest"] = booted_digest
+        baseline["staged_ref"] = staged_image.get("image") or None
+        baseline["staged_transport"] = staged_image.get("transport") or None
+        print(
+            f"Recorded pre-upgrade baseline: booted={booted_digest} "
+            f"staged_ref={baseline['staged_ref']}",
+            flush=True,
+        )
+        return
+
+    if booted_digest != baseline["digest"]:
+        rollback_digest = _deployment_digest(status.get("rollback"))
+        assert rollback_digest == baseline["digest"], (
+            "Cannot restore pre-upgrade baseline: booted digest "
+            f"{booted_digest!r} and rollback digest {rollback_digest!r} both differ "
+            f"from baseline {baseline['digest']!r}. Run this scenario on a fresh VM."
+        )
+        stdout, rc = run_ssh(context, "sudo bootc rollback")
+        assert rc == 0, f"sudo bootc rollback exited {rc}: {stdout!r}"
+        reboot_and_wait(context)
+        status = _read_bootc_status(context)
+        booted_digest = _deployment_digest(status.get("booted"))
+        assert booted_digest == baseline["digest"], (
+            f"Rollback did not restore baseline: booted {booted_digest!r} != "
+            f"{baseline['digest']!r}"
+        )
+        print(f"Restored pre-upgrade baseline {booted_digest}", flush=True)
+
+    staged_ref = baseline.get("staged_ref")
+    if staged_ref and status.get("staged") is None:
+        transport = baseline.get("staged_transport")
+        transport_arg = f"--transport {shlex.quote(transport)} " if transport else ""
+        stdout, rc = run_ssh(
+            context,
+            f"sudo bootc switch {transport_arg}{shlex.quote(staged_ref)}",
+            timeout=MIGRATION_SWITCH_TIMEOUT_S,
+        )
+        assert rc == 0, f"Re-staging {staged_ref!r} via bootc switch exited {rc}: {stdout!r}"
+        print(f"Re-staged pre-upgrade candidate {staged_ref}", flush=True)
+
+
 @step('Active image reference contains "{fragment}"')
 def active_image_contains(context, fragment):
     """Verify the booted image reference string contains the expected fragment."""
@@ -345,7 +427,7 @@ def os_release_reports_fedora_bluefin_identity(context):
 @step("If bootc upgrade output indicates image was staged, reboot VM and wait for SSH")
 def maybe_reboot_after_upgrade(context):
     output = getattr(context, "command_stdout", "")
-    if "Queued for next boot" in output:
+    if any(marker in output for marker in _UPGRADE_STAGED_MARKERS):
         reboot_and_wait(context)
 
 

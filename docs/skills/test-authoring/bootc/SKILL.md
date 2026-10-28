@@ -100,6 +100,28 @@ silently narrowing.
 When you need a mandatory step to prove a real change, fail with an
 `AssertionError` that names the observed output; do not `scenario.skip()`.
 
+### Every gated scenario starts from the pre-upgrade baseline
+
+Lifecycle scenarios share one VM and are not isolated. Once a scenario reboots
+into the candidate, the VM is already at latest and the next `bootc upgrade`
+is a no-op, which fails the gate above. So every scenario that calls
+`bootc upgrade output indicates image was staged` must start with:
+
+```gherkin
+* VM is restored to the pre-upgrade baseline deployment
+```
+
+The first call records the baseline (booted digest, plus the staged image ref
+if CI pre-staged the candidate with `bootc switch`). Later calls run
+`bootc rollback` + reboot when the booted digest has left the baseline, then
+re-run `bootc switch <ref>` if a pre-staged candidate is no longer staged. The
+baseline lives in `context.lifecycle_baseline`, set in `before_all` so it
+survives across scenarios. If neither booted nor rollback deployment is the
+baseline, the step fails — run that scenario on a fresh VM.
+
+`If bootc upgrade output indicates image was staged, reboot VM and wait for
+SSH` shares the same staged markers (`_UPGRADE_STAGED_MARKERS`) as the gate.
+
 ## ostree admin status parsing
 
 ```
