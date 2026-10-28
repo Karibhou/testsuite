@@ -22,11 +22,10 @@ and exercised with a qecore/Behave input+AT-SPI scenario.
 ## Provenance, image inventory and pre-boot preflight
 
 `gnomeos-*` tags and digests expire two weeks after push, so the lane resolves a digest per run
-and the action records it, with the guest `os-release` identity, in
-`results/guest-provenance.json`. Stock GNOME OS nightly carries every lane prerequisite except
-`gnome-ponytail-daemon`, and `scripts/guest_preflight.py` fails `suite: extensions` closed on that
-before boot. Evidence, commands and the full inventory:
-[gnomeos-guest-provenance.md](gnomeos-guest-provenance.md).
+and the action records it, with the guest `os-release` identity, in `results/guest-provenance.json`.
+Stock GNOME OS nightly carries every lane prerequisite except `gnome-ponytail-daemon`, and
+`scripts/guest_preflight.py` fails `suite: extensions` closed on that before boot. Evidence,
+commands and the full inventory: [gnomeos-guest-provenance.md](gnomeos-guest-provenance.md).
 
 ## Provisioned surface
 
@@ -173,12 +172,11 @@ and must never reach the host:
 - **No privileged host mounts** — the VM boots from a raw disk written by `bootc install`; the
   host filesystem is not writable from the guest.
 - **Credentials are guest-local and disposable** — the harness SSH key (`authorized_keys` in the
-  `bluefin-test` home, `action.yml:215`) and the `bluefin-test` autologin let the harness drive
-  the guest. Extension code runs in `gnome-shell` **as `bluefin-test`**, who also has
-  `NOPASSWD:ALL` sudo (`action.yml:224-226`), so extension code **can** read that key and escalate
-  **inside the guest**. Accepted: the key is generated per run, authorises nothing but this
-  throwaway VM, and grants no reach back to the host. Never reuse a long-lived or host-valid
-  credential here.
+  `bluefin-test` home, `action.yml:215`) and the `bluefin-test` autologin let the harness drive the
+  guest. Extension code runs in `gnome-shell` **as `bluefin-test`**, who also has `NOPASSWD:ALL`
+  sudo (`action.yml:224-226`), so extension code **can** read that key and escalate **inside the
+  guest**. Accepted: the key is generated per run, authorises nothing but this throwaway VM, and
+  grants no reach back to the host. Never reuse a long-lived or host-valid credential here.
 
 A host socket, key, or mount exposed to the guest desktop is a regression: stop and file an issue.
 
