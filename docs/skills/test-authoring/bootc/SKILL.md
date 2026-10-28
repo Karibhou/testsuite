@@ -111,13 +111,16 @@ is a no-op, which fails the gate above. So every scenario that calls
 * VM is restored to the pre-upgrade baseline deployment
 ```
 
-The first call records the baseline (booted digest, plus the staged image ref
-if CI pre-staged the candidate with `bootc switch`). Later calls run
-`bootc rollback` + reboot when the booted digest has left the baseline, then
-re-run `bootc switch <ref>` if a pre-staged candidate is no longer staged. The
-baseline lives in `context.lifecycle_baseline`, set in `before_all` so it
-survives across scenarios. If neither booted nor rollback deployment is the
-baseline, the step fails — run that scenario on a fresh VM.
+The first call records the booted digest as the baseline. Later calls run
+`bootc rollback` + reboot when the booted digest has left the baseline. The
+step does not re-stage anything: after CI pre-stages with `bootc switch
+<target>`, the host spec already tracks `<target>`, so a second `bootc switch`
+is a no-op ("Image specification is unchanged.") and the scenario's own
+`bootc upgrade` stages the candidate. The baseline lives in
+`context.lifecycle_baseline`, set in `before_all` so it survives across
+scenarios. If neither booted nor rollback deployment is the baseline (for
+example, a migration `bootc switch` ran earlier in the same behave run), the
+step fails — run that scenario on a fresh VM.
 
 `If bootc upgrade output indicates image was staged, reboot VM and wait for
 SSH` shares the same staged markers (`_UPGRADE_STAGED_MARKERS`) as the gate.

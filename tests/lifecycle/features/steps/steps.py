@@ -263,10 +263,6 @@ def _deployment_digest(deployment):
     return ((deployment or {}).get("image") or {}).get("imageDigest", "")
 
 
-def _deployment_image(deployment):
-    return ((deployment or {}).get("image") or {}).get("image") or {}
-
-
 def _read_bootc_status(context):
     stdout, rc = run_ssh(context, "sudo bootc status --format=json")
     assert rc == 0, f"sudo bootc status --format=json exited {rc}: {stdout!r}"
@@ -283,11 +279,16 @@ def restore_pre_upgrade_baseline(context):
     "bootc upgrade output indicates image was staged" gate. Every scenario
     that calls that gate starts with this step so each one gets a real upgrade.
 
-    The first call records the baseline: the booted digest plus, if CI
-    pre-staged the candidate via ``bootc switch``, the staged image reference.
-    Later calls roll back (and reboot) when the booted digest has moved off
-    the baseline, then re-stage the recorded candidate reference if the
-    pre-staged deployment is gone.
+    The first call records the booted digest as the baseline. Later calls
+    roll back (and reboot) when the booted digest has moved off the baseline.
+    Nothing is re-staged: if CI pre-staged the candidate via ``bootc switch``,
+    the host spec already tracks that ref, so the scenario's own
+    ``bootc upgrade`` stages the candidate again.
+
+    Recovery needs the baseline to be the booted or rollback deployment. A
+    scenario that moves the VM to a third image (e.g. a migration
+    ``bootc switch`` run in the same behave invocation) leaves it
+    unreachable, and the step fails rather than guessing.
     """
     baseline = getattr(context, "lifecycle_baseline", None)
     if not isinstance(baseline, dict):
@@ -299,15 +300,8 @@ def restore_pre_upgrade_baseline(context):
     assert booted_digest, f"Could not read booted imageDigest from bootc status: {status}"
 
     if not baseline.get("digest"):
-        staged_image = _deployment_image(status.get("staged"))
         baseline["digest"] = booted_digest
-        baseline["staged_ref"] = staged_image.get("image") or None
-        baseline["staged_transport"] = staged_image.get("transport") or None
-        print(
-            f"Recorded pre-upgrade baseline: booted={booted_digest} "
-            f"staged_ref={baseline['staged_ref']}",
-            flush=True,
-        )
+        print(f"Recorded pre-upgrade baseline: booted={booted_digest}", flush=True)
         return
 
     if booted_digest != baseline["digest"]:
@@ -327,18 +321,6 @@ def restore_pre_upgrade_baseline(context):
             f"{baseline['digest']!r}"
         )
         print(f"Restored pre-upgrade baseline {booted_digest}", flush=True)
-
-    staged_ref = baseline.get("staged_ref")
-    if staged_ref and status.get("staged") is None:
-        transport = baseline.get("staged_transport")
-        transport_arg = f"--transport {shlex.quote(transport)} " if transport else ""
-        stdout, rc = run_ssh(
-            context,
-            f"sudo bootc switch {transport_arg}{shlex.quote(staged_ref)}",
-            timeout=MIGRATION_SWITCH_TIMEOUT_S,
-        )
-        assert rc == 0, f"Re-staging {staged_ref!r} via bootc switch exited {rc}: {stdout!r}"
-        print(f"Re-staged pre-upgrade candidate {staged_ref}", flush=True)
 
 
 @step('Active image reference contains "{fragment}"')

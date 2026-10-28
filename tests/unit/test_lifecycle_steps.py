@@ -271,11 +271,7 @@ class TestRestorePreUpgradeBaseline:
 
         self.mod.restore_pre_upgrade_baseline(context)
 
-        assert context.lifecycle_baseline == {
-            "digest": "sha256:base",
-            "staged_ref": "ghcr.io/x:cand",
-            "staged_transport": "registry",
-        }
+        assert context.lifecycle_baseline == {"digest": "sha256:base"}
         assert self.commands == ["sudo bootc status --format=json"]
         reboot.assert_not_called()
 
@@ -285,7 +281,7 @@ class TestRestorePreUpgradeBaseline:
         )
         reboot = MagicMock()
         monkeypatch.setattr(self.mod, "reboot_and_wait", reboot)
-        context = self._context({"digest": "sha256:base", "staged_ref": None})
+        context = self._context({"digest": "sha256:base"})
 
         self.mod.restore_pre_upgrade_baseline(context)
 
@@ -305,7 +301,7 @@ class TestRestorePreUpgradeBaseline:
         )
         reboot = MagicMock()
         monkeypatch.setattr(self.mod, "reboot_and_wait", reboot)
-        context = self._context({"digest": "sha256:base", "staged_ref": None})
+        context = self._context({"digest": "sha256:base"})
 
         self.mod.restore_pre_upgrade_baseline(context)
 
@@ -313,7 +309,10 @@ class TestRestorePreUpgradeBaseline:
         reboot.assert_called_once_with(context)
         assert not any("bootc switch" in c for c in self.commands)
 
-    def test_restages_prestaged_candidate_after_rollback(self, monkeypatch):
+    def test_does_not_restage_prestaged_candidate_after_rollback(self, monkeypatch):
+        # bootc switch to the ref the host spec already tracks is a no-op
+        # ("Image specification is unchanged."); the scenario's own
+        # bootc upgrade stages the candidate instead.
         monkeypatch.setattr(
             self.mod,
             "run_ssh",
@@ -325,13 +324,12 @@ class TestRestorePreUpgradeBaseline:
             ),
         )
         monkeypatch.setattr(self.mod, "reboot_and_wait", MagicMock())
-        context = self._context(
-            {"digest": "sha256:base", "staged_ref": "ghcr.io/x:cand", "staged_transport": "registry"}
-        )
+        context = self._context({"digest": "sha256:base"})
 
         self.mod.restore_pre_upgrade_baseline(context)
 
-        assert self.commands[-1] == "sudo bootc switch --transport registry ghcr.io/x:cand"
+        assert self.commands[-1] == "sudo bootc status --format=json"
+        assert not any("bootc switch" in c for c in self.commands)
 
     def test_fails_when_baseline_is_unreachable(self, monkeypatch):
         monkeypatch.setattr(
@@ -340,7 +338,7 @@ class TestRestorePreUpgradeBaseline:
             self._fake_run_ssh([_bootc_status("sha256:cand", rollback="sha256:other")]),
         )
         monkeypatch.setattr(self.mod, "reboot_and_wait", MagicMock())
-        context = self._context({"digest": "sha256:base", "staged_ref": None})
+        context = self._context({"digest": "sha256:base"})
 
         with pytest.raises(AssertionError, match="Cannot restore pre-upgrade baseline"):
             self.mod.restore_pre_upgrade_baseline(context)
@@ -357,7 +355,7 @@ class TestRestorePreUpgradeBaseline:
             ),
         )
         monkeypatch.setattr(self.mod, "reboot_and_wait", MagicMock())
-        context = self._context({"digest": "sha256:base", "staged_ref": None})
+        context = self._context({"digest": "sha256:base"})
 
         with pytest.raises(AssertionError, match="Rollback did not restore baseline"):
             self.mod.restore_pre_upgrade_baseline(context)
