@@ -128,7 +128,14 @@ def main(argv: list[str] | None = None) -> int:
         return _fail(f"results.json at {path} is empty; suite produced no output")
 
     report, complete = load_report(text)
-    counts = count_scenarios(report)
+    try:
+        counts = count_scenarios(report)
+    except (AttributeError, TypeError):
+        # A corrupt report (a non-dict feature/element) raises here, exactly as
+        # it does for the mandatory-service-gate in extension_validation.py.
+        # A malformed results file cannot authorize qualification, so fail
+        # closed on zero passing rather than traceback.
+        counts = {status: 0 for status in _e2e_summary.COUNTED_STATUSES}
     passed = counts["passed"]
 
     print(

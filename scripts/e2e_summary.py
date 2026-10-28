@@ -87,19 +87,11 @@ def count_scenarios(report: list[dict[str, Any]]) -> dict[str, int]:
 
     Every scenario element is counted exactly once: known statuses under their
     own key, everything else (``error``, ``hook_error``, a missing status, or
-    any future behave status) under ``other``. Corrupt entries (a feature that
-    is not a mapping, or an element that is not a mapping) are skipped rather
-    than raised on, so a partially damaged report still counts what is intact;
-    a gate that only needs ``passed`` then fails the lane when nothing valid
-    passed.
+    any future behave status) under ``other``.
     """
     counts = {status: 0 for status in COUNTED_STATUSES}
     for feature in report:
-        if not isinstance(feature, dict):
-            continue
         for element in feature.get("elements") or []:
-            if not isinstance(element, dict):
-                continue
             if element.get("type") != "scenario":
                 continue
             status = element.get("status")
@@ -116,16 +108,11 @@ def scenario_statuses(report: list[dict[str, Any]]) -> dict[str, str]:
     Consumers that need per-scenario statuses (``just compare-results``)
     call this instead of keeping a private results.json walker, so the
     ``type == "scenario"`` filter stays a property of this module rather
-    than something every reader re-derives. Corrupt entries are skipped so a
-    damaged report never raises for a downstream consumer.
+    than something every reader re-derives.
     """
     statuses: dict[str, str] = {}
     for feature in report:
-        if not isinstance(feature, dict):
-            continue
         for element in feature.get("elements") or []:
-            if not isinstance(element, dict):
-                continue
             if element.get("type") != "scenario":
                 continue
             name = element.get("name")
