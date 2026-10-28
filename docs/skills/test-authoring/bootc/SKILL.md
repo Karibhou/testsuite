@@ -50,7 +50,7 @@ Bare `payload.get("status", {})` silently accepts malformed JSON — don't use i
 
 ## Lifecycle capture pattern
 
-Capture digests at the right moments or verification steps silently skip:
+Capture digests at the right moments or the verification steps fail with a missing-evidence assertion:
 
 ```python
 # 1. Before upgrade — save current digest
@@ -66,7 +66,7 @@ expected_upgrade_digest = get_staged_digest(context)
 # 5. After reboot — assert booted == expected_upgrade_digest
 ```
 
-Without step 3, the post-reboot assertion has nothing to compare against and silently passes or skips.
+Omitting step 1 or step 3 leaves the post-reboot assertion with no expected digest, so the verification steps fail rather than skip.
 
 ## Upgrade-staged is a mandatory qualification gate
 
