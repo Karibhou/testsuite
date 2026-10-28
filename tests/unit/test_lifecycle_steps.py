@@ -490,3 +490,89 @@ class TestDeploymentIsSettled:
             context, "sudo bootc status --format=json", timeout=15
         )
 
+
+
+class TestDigestVerification:
+    """Missing evidence and same-image reboots must fail rather than skip."""
+
+    original = "sha256:" + "a" * 64
+    candidate = "sha256:" + "b" * 64
+
+    def setup_method(self):
+        self.mod = _import_lifecycle_steps()
+
+    def context(self, booted=None, staged=None, original=None, expected=None):
+        return types.SimpleNamespace(
+            command_stdout=_bootc_status(booted, staged=staged),
+            original_digest=original,
+            expected_upgrade_digest=expected,
+            scenario=MagicMock(),
+        )
+
+    def status_command(self, context, rc=0):
+        self.mod.run_ssh.side_effect = lambda *a, **kw: (context.command_stdout, rc)
+
+    @pytest.mark.parametrize("digest", [None, "", "sha256:abcd", "not-a-digest"])
+    def test_original_capture_rejects_missing_or_invalid_digest(self, digest):
+        context = self.context(booted=digest)
+        self.status_command(context)
+        with pytest.raises(AssertionError, match="booted imageDigest"):
+            self.mod.capture_original_digest(context)
+        assert context.original_digest is None
+
+    def test_original_capture_checks_command_return_code(self):
+        context = self.context(booted=self.original)
+        self.status_command(context, rc=1)
+        with pytest.raises(AssertionError, match="exited 1"):
+            self.mod.capture_original_digest(context)
+        assert context.original_digest is None
+
+    def test_distinct_candidate_is_captured_and_verified_after_reboot(self):
+        context = self.context(booted=self.original)
+        self.status_command(context)
+        self.mod.capture_original_digest(context)
+        context.command_stdout = _bootc_status(self.original, staged=self.candidate)
+        self.mod.capture_staged_digest(context)
+        assert context.expected_upgrade_digest == self.candidate
+        context.command_stdout = _bootc_status(self.candidate)
+        self.mod.active_matches_target(context)
+        context.command_stdout = _bootc_status(self.original)
+        self.mod.active_matches_original(context)
+        context.scenario.skip.assert_not_called()
+
+    @pytest.mark.parametrize("staged", [None, "", "sha256:abcd", original])
+    def test_candidate_capture_rejects_absent_invalid_or_unchanged_digest(self, staged):
+        context = self.context(booted=self.original, staged=staged, original=self.original)
+        self.status_command(context)
+        with pytest.raises(AssertionError):
+            self.mod.capture_staged_digest(context)
+        assert context.expected_upgrade_digest is None
+
+    def test_candidate_capture_requires_original_evidence(self):
+        context = self.context(booted=self.original, staged=self.candidate)
+        self.status_command(context)
+        with pytest.raises(AssertionError, match="original_digest is not set"):
+            self.mod.capture_staged_digest(context)
+
+    def test_candidate_capture_checks_command_return_code(self):
+        context = self.context(booted=self.original, staged=self.candidate, original=self.original)
+        self.status_command(context, rc=1)
+        with pytest.raises(AssertionError, match="exited 1"):
+            self.mod.capture_staged_digest(context)
+        assert context.expected_upgrade_digest is None
+
+    @pytest.mark.parametrize("check", ["active_matches_target", "active_matches_original"])
+    def test_verification_fails_without_expected_evidence(self, check):
+        context = self.context(booted=self.original)
+        with pytest.raises(AssertionError, match="is not set"):
+            getattr(self.mod, check)(context)
+        context.scenario.skip.assert_not_called()
+
+    @pytest.mark.parametrize("check", ["active_matches_target", "active_matches_original"])
+    def test_verification_rejects_wrong_running_digest(self, check):
+        context = self.context(
+            booted=self.candidate, original=self.original, expected=self.original,
+        )
+        with pytest.raises(AssertionError, match="Active digest"):
+            getattr(self.mod, check)(context)
+        context.scenario.skip.assert_not_called()

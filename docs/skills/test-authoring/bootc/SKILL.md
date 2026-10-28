@@ -243,3 +243,27 @@ boot device. That lives in the VM spec, owned by `projectbluefin/lab`, not this 
 Without it a reboot silently returns to the live rootdisk and the scenario passes while
 testing nothing — which is why that scenario stays `@future` rather than being written
 optimistically.
+
+## Digest evidence must fail closed
+
+`Capture staged image digest as upgrade target` requires a previously captured
+original digest and a valid SHA-256 staged digest different from that original.
+Capture the original in the same scenario before upgrading, including when the
+scenario also tracks `VERSION_ID`. Both capture steps check the status command's
+exit code before trusting its JSON.
+
+The active-target and active-original assertions fail when their expected digest
+is missing; they must never turn missing evidence into a skipped scenario. In a
+rollback scenario, verify the running candidate **before** requesting rollback,
+then verify the original after the second reboot. Returning to the original alone
+does not prove that the candidate ever booted.
+
+These checks establish distinct observed deployments, not fixture provenance.
+Mandatory release qualification still needs independently pinned source/candidate
+refs, verification against the intended candidate rather than just the observed
+staged image, rejection of stale pre-staging, and a verdict that rejects skipped
+required scenarios. The existing workflow's `bootc switch` pre-staging and the
+external `projectbluefin/actions` upgrade caller do not establish those guarantees
+(remaining work in #1023, coordinated with the second-image prerequisite in #706).
+Do not cite a unit test or a Behave dry-run as evidence of a hosted upgrade and
+rollback; retain the real VM's status, digest and reboot evidence separately.
