@@ -151,6 +151,60 @@ def test_only_backgrounds_exits_one(tmp_path, capsys):
 
 
 # ---------------------------------------------------------------------------
+# Deliberate inapplicability (--skip-reason)
+#
+# A deliberately inapplicable mandatory shard (e.g. the KDE webdriver stack
+# could not be installed) is a passing terminal state for the gate: it is not a
+# product failure and must not block qualification. This is distinct from a
+# runnable suite that silently self-disabled every scenario, which still fails
+# via the passed==0 check.
+# ---------------------------------------------------------------------------
+
+
+def test_deliberate_skip_passes_even_with_zero_passing(tmp_path, capsys):
+    """0 passing scenarios, but an explicit inapplicability reason is a pass."""
+    path = _write(tmp_path, _report("skipped"))
+    assert main([str(path), "--skip-reason", "Plasma below 5.27"]) == 0
+    out = capsys.readouterr().out
+    assert "deliberately inapplicable" in out
+    assert "Plasma below 5.27" in out
+    assert "0 passing scenarios" not in out
+
+
+def test_deliberate_skip_passes_without_any_results_file(tmp_path, capsys):
+    """The marker authorizes the gate before the results.json is even read."""
+    missing = tmp_path / "does-not-exist.json"
+    assert main([str(missing), "--skip-reason", "unsupported distro"]) == 0
+    assert "deliberately inapplicable" in capsys.readouterr().out
+
+
+def test_self_disable_without_skip_reason_fails(tmp_path, capsys):
+    """Same 0-passing report, but no inapplicability reason: fail closed."""
+    path = _write(tmp_path, _report("skipped"))
+    assert main([str(path)]) == 1
+    out = capsys.readouterr().out
+    assert "0 passing scenarios" in out
+    assert "deliberately inapplicable" not in out
+
+
+def test_empty_skip_reason_is_treated_as_no_marker(tmp_path, capsys):
+    """An empty --skip-reason must not exempt a self-disabled suite."""
+    path = _write(tmp_path, _report("skipped"))
+    assert main([str(path), "--skip-reason", ""]) == 1
+    assert "0 passing scenarios" in capsys.readouterr().out
+
+
+def test_failed_setup_marker_wins_over_skip_reason(tmp_path, capsys):
+    """Fail-closed wins: a setup failure blocks even if a skip reason is given."""
+    marker = tmp_path / "results" / "failed_setup.txt"
+    marker.parent.mkdir(parents=True)
+    marker.write_text("qecore-headless startup failed", encoding="utf-8")
+    results = _write(tmp_path, _report("skipped"))
+    assert main([str(results), "--skip-reason", "reason", "--failed-setup-marker", str(marker)]) == 1
+    assert "before_all setup failed" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
 # Bad / incomplete input
 # ---------------------------------------------------------------------------
 

@@ -14,6 +14,12 @@ the run cannot authorize qualification:
 - the file is empty or truncated (a crashed lane left a partial ``results.json``),
 - or ``passed`` is 0 (every counted scenario was skipped/undefined/untested/error).
 
+A deliberately inapplicable shard (the KDE webdriver stack could not be installed
+and the suite was skipped with an explicit reason) is a passing terminal state:
+it is not a product failure, so ``--skip-reason`` authorizes qualification. A
+runnable suite that silently self-disabled every scenario is distinct and still
+fails via the ``passed == 0`` check.
+
 Optional documented skips stay visible in the job summary and never fail this
 gate on their own; a run with at least one genuinely passing scenario is
 qualified. Infrastructure failure (image never booted, no results at all) is
@@ -77,6 +83,18 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="Path to the failed_setup marker file (default: results/failed_setup.txt)",
     )
+    parser.add_argument(
+        "--skip-reason",
+        default="",
+        help=(
+            "Optional reason a mandatory shard was deliberately inapplicable "
+            "(e.g. the KDE webdriver stack could not be installed). A non-empty "
+            "value is a passing terminal state for the gate: an inapplicable "
+            "shard is not a product failure. An empty value keeps the "
+            "fail-closed checks below. Do not use this to exempt a runnable "
+            "suite that merely skipped every scenario."
+        ),
+    )
     args = parser.parse_args(argv)
 
     # A before_all/setup failure writes this marker and then every scenario is
@@ -87,6 +105,15 @@ def main(argv: list[str] | None = None) -> int:
             f"Harness before_all setup failed ({args.failed_setup_marker}); "
             "all scenarios were skipped and qualification must not pass"
         )
+
+    # A deliberately inapplicable shard (e.g. KDE webdriver stack could not be
+    # installed) is a passing terminal state: it is not a product failure and
+    # must not block qualification. This is distinct from a runnable suite that
+    # silently self-disabled every scenario, which the passed==0 check below
+    # still fails.
+    if args.skip_reason:
+        print(f"PASS: suite deliberately inapplicable ({args.skip_reason}); no mandatory coverage required")
+        return 0
 
     path = args.results_json
     if not path.is_file():

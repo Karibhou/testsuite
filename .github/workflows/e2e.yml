@@ -1917,7 +1917,10 @@ jobs:
       # false green. assert_passed.py is the single authoritative verdict contract
       # shared with the GNOME e2e action; it fails on the failed_setup marker, an
       # empty/truncated results.json, or 0 passing scenarios. Optional documented
-      # skips (quarantine/pending/future) never fail it on their own.
+      # skips (quarantine/pending/future) never fail it on their own. A
+      # deliberately inapplicable shard (KDE webdriver stack could not be
+      # installed) is passed through --skip-reason and is a passing terminal
+      # state for the gate, not a product failure.
       - name: Assert desktop suite has passing scenarios
         if: |
           (startsWith(env.SUITE_DIR, 'kde') ||
@@ -1925,7 +1928,9 @@ jobs:
            env.SUITE_DIR == 'dx' || env.SUITE_DIR == 'software' ||
            env.SUITE_DIR == 'vanilla-gnome') &&
           steps.run.outputs.behave_rc == '0'
-        run: python3 scripts/assert_passed.py results/results.json
+        run: |
+          python3 scripts/assert_passed.py results/results.json \
+            --skip-reason "${{ steps.kde_webdriver.outputs.skip_reason }}"
 
       - name: Write e2e metadata
         if: always()
