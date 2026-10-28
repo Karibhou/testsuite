@@ -17,7 +17,13 @@ Usage:
     python3 scripts/vm_validation_plan.py tests/smoke/features/steps/x.py
 
 Prints JSON: {"vm_required": bool, "suites": [...], "no_hosted_lane": [...],
-"reasons": {path: [suite, ...]}}.
+"composite_action": [...], "reasons": {path: [suite, ...]}}.
+
+``composite_action`` lists pseudo-lanes for code e2e.yml never executes: the
+gnome-e2e composite action and the extension-validation gate it alone runs
+(e2e.yml neither uses the action nor sparse-checks-out that script). Booting
+e2e.yml suites cannot validate those changes, so they are reported separately
+and must be exercised through a workflow that calls the action at the PR ref.
 """
 
 from __future__ import annotations
@@ -32,6 +38,9 @@ GUI = "smoke"
 SSH = "common"
 LIFECYCLE = "lifecycle"
 FULL = (GUI, SSH, LIFECYCLE)
+# Pseudo-lane: needs a run of the gnome-e2e composite action, not e2e.yml.
+ACTION = "gnome-e2e-action"
+ACTION_LANES = frozenset({ACTION})
 
 # Suites e2e.yml can boot on hosted runners (its `suites` input).
 HOSTED_SUITES = frozenset(
@@ -86,7 +95,7 @@ RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
     (".github/workflows/build-kde-runner.yml", ("kde-smoke",)),
     (".github/workflows/build-runner.yml", (GUI, SSH)),
     # Distributed workflow and composite action.
-    (".github/actions/gnome-e2e/*", (GUI, "extensions")),
+    (".github/actions/gnome-e2e/*", (ACTION,)),
     (".github/workflows/e2e.yml", FULL),
     (".github/workflows/manual.yml", FULL),
     (".github/workflows/migration-test.yml", (LIFECYCLE,)),
@@ -94,7 +103,8 @@ RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
     # Helper scripts e2e.yml sparse-checks-out and runs per suite.
     ("scripts/install-kde-webdriver.sh", ("kde-smoke",)),
     ("scripts/assert_kde_passed.py", ("kde-smoke",)),
-    ("scripts/extension_validation.py", ("extensions",)),
+    # Run only inside the gnome-e2e composite action, never by e2e.yml.
+    ("scripts/extension_validation.py", (ACTION,)),
     ("scripts/*", (GUI, SSH)),
     ("flatpak-app-list.txt", (GUI, SSH)),
 )
@@ -132,7 +142,8 @@ def plan(paths: list[str]) -> dict:
     return {
         "vm_required": bool(required),
         "suites": sorted(required & HOSTED_SUITES),
-        "no_hosted_lane": sorted(required - HOSTED_SUITES),
+        "no_hosted_lane": sorted(required - HOSTED_SUITES - ACTION_LANES),
+        "composite_action": sorted(required & ACTION_LANES),
         "reasons": reasons,
     }
 

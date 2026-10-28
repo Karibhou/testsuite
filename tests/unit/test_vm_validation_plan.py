@@ -9,7 +9,14 @@ from pathlib import Path
 
 import pytest
 
-from scripts.vm_validation_plan import FULL, HOSTED_SUITES, plan, suites_for_path
+from scripts.vm_validation_plan import (
+    ACTION,
+    ACTION_LANES,
+    FULL,
+    HOSTED_SUITES,
+    plan,
+    suites_for_path,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "vm_validation_plan.py"
@@ -71,8 +78,30 @@ def test_reusable_workflow_change_requires_full_representative_set():
     assert set(FULL) == {"smoke", "common", "lifecycle"}
 
 
-def test_composite_action_change_requires_gui_lanes():
-    assert suites_for_path(".github/actions/gnome-e2e/action.yml") == ("smoke", "extensions")
+@pytest.mark.parametrize(
+    "path",
+    [".github/actions/gnome-e2e/action.yml", "scripts/extension_validation.py"],
+)
+def test_composite_action_code_maps_to_action_pseudo_lane(path):
+    assert suites_for_path(path) == (ACTION,)
+
+
+def test_composite_action_reported_outside_e2e_suites():
+    result = plan(
+        [".github/actions/gnome-e2e/action.yml", "scripts/extension_validation.py"]
+    )
+    assert result["vm_required"] is True
+    assert result["suites"] == []
+    assert result["no_hosted_lane"] == []
+    assert result["composite_action"] == [ACTION]
+
+
+def test_composite_action_combines_with_e2e_suites():
+    result = plan(
+        [".github/actions/gnome-e2e/action.yml", "tests/smoke/features/x.feature"]
+    )
+    assert result["suites"] == ["smoke"]
+    assert result["composite_action"] == [ACTION]
 
 
 def test_runner_image_change_requires_gui_and_ssh():
@@ -104,6 +133,7 @@ def test_suite_without_hosted_lane_is_reported_not_dropped():
     assert result["vm_required"] is True
     assert result["suites"] == []
     assert result["no_hosted_lane"] == ["hardware"]
+    assert result["composite_action"] == []
 
 
 def test_every_mapped_suite_is_known():
@@ -114,7 +144,7 @@ def test_every_mapped_suite_is_known():
         "scripts/extension_validation.py",
         "tests/shared/screenshot.py",
     ]:
-        assert set(suites_for_path(path)) <= HOSTED_SUITES
+        assert set(suites_for_path(path)) <= HOSTED_SUITES | ACTION_LANES
 
 
 def test_cli_reads_stdin_and_prints_json():

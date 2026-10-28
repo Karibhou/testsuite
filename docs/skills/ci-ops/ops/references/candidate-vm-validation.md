@@ -32,7 +32,7 @@ git diff --name-only upstream/main...HEAD | python3 scripts/vm_validation_plan.p
 | `tests/shared/extension_*`, `gnome_extensions_*` | `extensions` |
 | `tests/shared/ssh_*` | `common`, `lifecycle` |
 | other `tests/shared/*`, `container/` runner, `scripts/*` that `e2e.yml` runs | `smoke`, `common` |
-| `.github/actions/gnome-e2e/**` | `smoke`, `extensions` |
+| `.github/actions/gnome-e2e/**`, `scripts/extension_validation.py` | `gnome-e2e-action` (reported under `composite_action`, not `suites`) |
 | `.github/workflows/e2e.yml`, `manual.yml` | `smoke`, `common`, `lifecycle` |
 | `migration-test.yml` / `iso-*.yml` | `lifecycle` / `installer` |
 | anything else | `smoke`, `common`, `lifecycle` (fail-closed) |
@@ -41,6 +41,13 @@ git diff --name-only upstream/main...HEAD | python3 scripts/vm_validation_plan.p
 lane. Suites with no hosted `e2e.yml` lane (`hardware`, `security`, `nvidia`,
 `flatcar`) are reported under `no_hosted_lane` rather than dropped — the plan
 must not read as "nothing to boot" when it cannot validate them.
+
+`e2e.yml` never calls the `gnome-e2e` composite action, and its sparse checkout
+excludes `scripts/extension_validation.py`, which only the action runs. Booting
+`e2e.yml` suites therefore exercises none of that code. Such changes are
+reported under `composite_action` (pseudo-lane `gnome-e2e-action`), excluded
+from `suites` and `no_hosted_lane`; validate them with a workflow that uses
+`.github/actions/gnome-e2e` at the PR's ref.
 
 When adding a workflow, script or shared helper, add a rule: an unmatched path
 silently costs the full set, and a wrong empty rule silently skips validation.
