@@ -219,13 +219,23 @@ def active_matches_original(context):
     )
 
 
+_UPGRADE_STAGED_MARKERS = ("Queued for next boot", "Staged update present")
+
+
 @step("bootc upgrade output indicates image was staged")
 def upgrade_output_staged(context):
     """Verify bootc upgrade staged a distinct image for the next boot.
 
-    ``bootc upgrade`` exits 0 in two distinct cases:
+    ``bootc upgrade`` exits 0 in three distinct cases:
       - New image available: output contains "Queued for next boot: <ref>"
+      - Staged deployment already matches the fetched image: output contains
+        "Staged update present, not changed" (e.g. an earlier scenario on the
+        same VM, or CI pre-staging via ``bootc switch``, staged it already)
       - Already up-to-date: output contains "No update available."
+
+    The first two both leave a staged candidate for the next boot and pass;
+    digest identity is proven separately by "Capture staged image digest as
+    upgrade target" and the post-reboot digest assertions.
 
     This step is a mandatory qualification gate. The upgrade lifecycle
     scenarios that call it prove a real upgrade and rollback: the booted
@@ -240,7 +250,7 @@ def upgrade_output_staged(context):
     VM and wait for SSH" to reboot only when something was actually staged.
     """
     output = getattr(context, "command_stdout", "")
-    if "Queued for next boot" not in output:
+    if not any(marker in output for marker in _UPGRADE_STAGED_MARKERS):
         raise AssertionError(
             "bootc upgrade did not stage a new image — this mandatory lifecycle "
             "qualification requires a real upgrade to a distinct candidate digest, "

@@ -161,6 +161,13 @@ class TestUpgradeOutputStaged:
         # Must not raise — a real upgrade was staged.
         self.mod.upgrade_output_staged(context)
 
+    def test_passes_when_staged_update_already_present(self):
+        # bootc prints this when the staged deployment already matches the
+        # fetched digest (prior scenario on same VM, or CI pre-staging).
+        context = MagicMock(command_stdout="Staged update present, not changed\n")
+
+        self.mod.upgrade_output_staged(context)
+
     def test_fails_when_no_update_available(self):
         context = MagicMock(command_stdout="No update available.")
 

@@ -72,9 +72,16 @@ Without step 3, the post-reboot assertion has nothing to compare against and sil
 
 The step **`bootc upgrade output indicates image was staged`** (in
 `tests/lifecycle/features/steps/steps.py`) is the gate that stops a run from
-passing without doing an upgrade. `bootc upgrade` exits 0 in two cases: it
-stages a new image (output contains `Queued for next boot: <ref>`), or it is a
-no-op (output contains `No update available.`).
+passing without doing an upgrade. `bootc upgrade` exits 0 in three cases:
+
+- it stages a new image (output contains `Queued for next boot: <ref>`) — **staged, passes**;
+- a staged deployment already matches the fetched image (output contains
+  `Staged update present, not changed`) — **staged, passes**. This happens when
+  an earlier scenario on the same VM already staged the upgrade without
+  rebooting, or when CI pre-staged the candidate with `bootc switch`. Digest
+  identity is still proven by `Capture staged image digest as upgrade target`
+  and the post-reboot digest assertions;
+- it is a no-op (output contains `No update available.`) — **fails**.
 
 This step must **fail** on a no-op, not skip it. The upgrade/rollback lifecycle
 scenarios call it to prove a real change: the booted digest must move to a
