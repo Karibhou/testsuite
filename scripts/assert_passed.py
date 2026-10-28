@@ -6,8 +6,9 @@ every scenario was skipped/undefined/untested, so a smoke lane whose
 ``before_all`` setup failed (all scenarios skipped) produced a green job. That
 is a false green: nothing was executed, yet qualification passed.
 
-This gate is the single authoritative verdict contract shared by every suite
-(GNOME in the ``gnome-e2e`` action, KDE in ``e2e.yml``). It fails the job when
+This gate is the verdict contract for the desktop suites in ``e2e.yml`` (KDE
+and the smoke/developer/dx/software/vanilla-gnome lanes); the ``gnome-e2e``
+action does not call it yet (a follow-up). It fails the job when
 the run cannot authorize qualification:
 
 - the results file is missing after the run,
@@ -95,6 +96,17 @@ def main(argv: list[str] | None = None) -> int:
             "suite that merely skipped every scenario."
         ),
     )
+    parser.add_argument(
+        "--allow-all-skipped",
+        action="store_true",
+        help=(
+            "Treat a complete report in which every scenario was skipped as a "
+            "pass. Only for a shard whose scenarios legitimately all skip on "
+            "some images (smoke-firefox on a Flatpak-only-Firefox image, #924). "
+            "A setup failure, a missing or truncated report, or any "
+            "failed/undefined/untested scenario still fails."
+        ),
+    )
     args = parser.parse_args(argv)
 
     # A before_all/setup failure writes this marker and then every scenario is
@@ -150,6 +162,13 @@ def main(argv: list[str] | None = None) -> int:
             "results.json is incomplete or truncated; a crashed lane cannot "
             "authorize qualification"
         )
+    if (
+        args.allow_all_skipped
+        and counts["skipped"] > 0
+        and sum(counts.values()) == counts["skipped"]
+    ):
+        print("PASS: every scenario was skipped and this shard allows that")
+        return 0
     if passed == 0:
         return _fail(
             "suite reported 0 passing scenarios; skipped/undefined/untested runs "

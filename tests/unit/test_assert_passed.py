@@ -204,6 +204,44 @@ def test_failed_setup_marker_wins_over_skip_reason(tmp_path, capsys):
     assert "before_all setup failed" in capsys.readouterr().out
 
 
+
+# ---------------------------------------------------------------------------
+# --allow-all-skipped: a shard whose only scenarios legitimately all skip
+# (smoke-firefox on a Flatpak-only-Firefox image, #924) passes when every
+# scenario was skipped, and only then.
+# ---------------------------------------------------------------------------
+
+
+def test_allow_all_skipped_passes_an_all_skipped_run(tmp_path, capsys):
+    path = _write(tmp_path, _report("skipped"))
+    assert main([str(path), "--allow-all-skipped"]) == 0
+    assert "every scenario was skipped" in capsys.readouterr().out
+
+
+def test_allow_all_skipped_still_fails_a_failed_scenario(tmp_path, capsys):
+    path = _write(tmp_path, _report("skipped", "failed"))
+    assert main([str(path), "--allow-all-skipped"]) == 1
+    assert "0 passing scenarios" in capsys.readouterr().out
+
+
+def test_allow_all_skipped_still_fails_undefined(tmp_path, capsys):
+    path = _write(tmp_path, _report("skipped", "undefined"))
+    assert main([str(path), "--allow-all-skipped"]) == 1
+
+
+def test_allow_all_skipped_still_fails_an_empty_report(tmp_path, capsys):
+    path = _write(tmp_path, [])
+    assert main([str(path), "--allow-all-skipped"]) == 1
+
+
+def test_failed_setup_marker_wins_over_allow_all_skipped(tmp_path, capsys):
+    marker = tmp_path / "results" / "failed_setup.txt"
+    marker.parent.mkdir(parents=True)
+    marker.write_text("qecore-headless startup failed", encoding="utf-8")
+    results = _write(tmp_path, _report("skipped"))
+    assert main([str(results), "--allow-all-skipped", "--failed-setup-marker", str(marker)]) == 1
+    assert "before_all setup failed" in capsys.readouterr().out
+
 # ---------------------------------------------------------------------------
 # Bad / incomplete input
 # ---------------------------------------------------------------------------
