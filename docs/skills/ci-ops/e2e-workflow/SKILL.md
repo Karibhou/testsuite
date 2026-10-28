@@ -103,8 +103,7 @@ protecting anything.
 
 ## Job-summary scenario counts come from `scripts/e2e_summary.py`
 
-Never derive `passed` by subtraction. `passed = total - failed - skipped` is wrong
-on two counts:
+Never derive `passed` by subtraction. `passed = total - failed - skipped` is wrong on two counts:
 
 - `results.json` `elements` include **`background`** entries alongside `scenario`
   ones, so `len(elements)` overstates the scenario total.
