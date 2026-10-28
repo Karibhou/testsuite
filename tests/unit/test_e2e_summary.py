@@ -78,6 +78,28 @@ def test_features_without_elements_are_tolerated():
     assert sum(count_scenarios([{}, {"elements": None}]).values()) == 0
 
 
+def test_non_dict_feature_and_element_entries_are_skipped():
+    """A partially damaged report (corrupt feature or element) is counted over
+    what is intact rather than raising, so a downstream gate fails closed on
+    0 passing instead of crashing."""
+    report = [
+        "not-a-dict",
+        {"elements": ["not-a-dict", {"type": "scenario", "status": "passed"}]},
+    ]
+    counts = count_scenarios(report)
+
+    assert counts["passed"] == 1
+    assert sum(counts.values()) == 1
+
+
+def test_scenario_statuses_skips_non_dict_entries():
+    report = ["not-a-dict", {"elements": ["not-a-dict", {"type": "scenario", "name": "s", "status": "passed"}]}]
+
+    statuses = scenario_statuses(report)
+
+    assert statuses == {"s": "passed"}
+
+
 def test_success_requires_passed_or_skipped_only():
     assert is_success(count_scenarios(_report("passed", "skipped")))
     assert summary_icon(count_scenarios(_report("passed", "skipped"))) == "✅"

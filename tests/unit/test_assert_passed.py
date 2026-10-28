@@ -1,8 +1,10 @@
-"""Unit tests for scripts/assert_kde_passed.py.
+"""Unit tests for scripts/assert_passed.py.
 
-The guard is the last line of defence against a false green: a KDE run where
-behave exits 0 but every scenario was skipped/undefined/untested. These tests
-lock in that only ``status == 'passed'`` scenarios count as coverage.
+The gate is the single authoritative verdict contract that prevents a false
+green: a suite run where behave exits 0 but every scenario was
+skipped/undefined/untested, or where ``results.json`` is missing, empty, or
+truncated. These tests lock in that only ``status == 'passed'`` scenarios count
+as coverage and that an incomplete report never qualifies a candidate.
 """
 
 from __future__ import annotations
@@ -15,13 +17,9 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from scripts.assert_kde_passed import (  # noqa: E402
-    count_statuses,
-    format_breakdown,
-    main,
-)
+from scripts.assert_passed import main  # noqa: E402
 
-SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "assert_kde_passed.py"
+SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "assert_passed.py"
 
 
 # ---------------------------------------------------------------------------
@@ -36,7 +34,7 @@ def _scenario(name: str, status: str) -> dict:
 def _report(*statuses: str) -> list[dict]:
     return [
         {
-            "name": "KDE smoke",
+            "name": "suite smoke",
             "elements": [
                 _scenario(f"scenario {index}", status)
                 for index, status in enumerate(statuses)
@@ -48,6 +46,12 @@ def _report(*statuses: str) -> list[dict]:
 def _write(tmp_path: Path, report) -> Path:
     path = tmp_path / "results.json"
     path.write_text(json.dumps(report), encoding="utf-8")
+    return path
+
+
+def _write_text(tmp_path: Path, text: str) -> Path:
+    path = tmp_path / "results.json"
+    path.write_text(text, encoding="utf-8")
     return path
 
 
@@ -65,15 +69,18 @@ def test_all_passed_exits_zero(tmp_path, capsys):
 def test_no_scenarios_at_all_exits_one(tmp_path, capsys):
     path = _write(tmp_path, [])
     assert main([str(path)]) == 1
-    assert "::error::KDE suite reported 0 passing scenarios" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "passed=0" in out
+    assert "0 passing scenarios" in out
 
 
 def test_all_skipped_exits_one(tmp_path, capsys):
     path = _write(tmp_path, _report("skipped", "skipped"))
     assert main([str(path)]) == 1
     out = capsys.readouterr().out
+    assert "passed=0" in out
     assert "skipped=2" in out
-    assert "::error::KDE suite reported 0 passing scenarios" in out
+    assert "0 passing scenarios" in out
 
 
 def test_all_undefined_exits_one(tmp_path, capsys):
@@ -83,7 +90,7 @@ def test_all_undefined_exits_one(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "passed=0" in out
     assert "undefined=3" in out
-    assert "::error::KDE suite reported 0 passing scenarios" in out
+    assert "0 passing scenarios" in out
 
 
 def test_all_untested_exits_one(tmp_path, capsys):
@@ -91,32 +98,30 @@ def test_all_untested_exits_one(tmp_path, capsys):
     assert main([str(path)]) == 1
     out = capsys.readouterr().out
     assert "untested=2" in out
-    assert "::error::KDE suite reported 0 passing scenarios" in out
+    assert "0 passing scenarios" in out
 
 
-def test_unknown_status_counts_as_other_and_exits_one(tmp_path, capsys):
-    path = _write(tmp_path, _report("hook_error"))
+def test_errored_run_exits_one(tmp_path, capsys):
+    """behave 1.3.3 emits error/hook_error; neither is passing coverage."""
+    path = _write(tmp_path, _report("error", "hook_error"))
     assert main([str(path)]) == 1
-    assert "other=1" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "other=2" in out
+    assert "0 passing scenarios" in out
 
 
 def test_mixed_passed_and_failed_exits_zero(tmp_path, capsys):
-    """behave_rc gates real failures; this guard only asserts passed > 0."""
+    """behave_rc gates real failures; this gate only asserts passed > 0."""
     path = _write(tmp_path, _report("passed", "failed", "skipped"))
     assert main([str(path)]) == 0
     out = capsys.readouterr().out
     assert "passed=1 failed=1" in out
 
 
-# ---------------------------------------------------------------------------
-# Non-scenario elements
-# ---------------------------------------------------------------------------
-
-
 def test_backgrounds_are_not_counted_as_passed(tmp_path, capsys):
     report = [
         {
-            "name": "KDE smoke",
+            "name": "suite smoke",
             "elements": [
                 {"type": "background", "name": "Shared setup", "status": "passed"},
                 _scenario("real scenario", "passed"),
@@ -131,7 +136,7 @@ def test_backgrounds_are_not_counted_as_passed(tmp_path, capsys):
 def test_only_backgrounds_exits_one(tmp_path, capsys):
     report = [
         {
-            "name": "KDE smoke",
+            "name": "suite smoke",
             "elements": [
                 {"type": "background", "name": "Setup A", "status": "passed"},
                 {"type": "background", "name": "Setup B", "status": "passed"},
@@ -142,83 +147,115 @@ def test_only_backgrounds_exits_one(tmp_path, capsys):
     assert main([str(path)]) == 1
     out = capsys.readouterr().out
     assert "passed=0" in out
-    assert "::error::KDE suite reported 0 passing scenarios" in out
-
-
-def test_feature_without_elements_key_is_tolerated(tmp_path, capsys):
-    path = _write(tmp_path, [{"name": "Empty feature"}, {"name": "Null", "elements": None}])
-    assert main([str(path)]) == 1
-    assert "passed=0" in capsys.readouterr().out
+    assert "0 passing scenarios" in out
 
 
 # ---------------------------------------------------------------------------
-# Bad input
+# Bad / incomplete input
 # ---------------------------------------------------------------------------
 
 
 def test_missing_results_file_exits_one(tmp_path, capsys):
     missing = tmp_path / "does-not-exist.json"
     assert main([str(missing)]) == 1
-    assert "::error::No results.json found after KDE suite run" in capsys.readouterr().out
+    assert "No results.json found" in capsys.readouterr().out
+
+
+def test_failed_setup_marker_exits_one_even_with_passed(tmp_path, capsys):
+    """A before_all failure writes the marker and skips every scenario; behave
+    exits 0. The gate must fail closed on the marker before trusting results."""
+    marker = tmp_path / "results" / "failed_setup.txt"
+    marker.parent.mkdir(parents=True)
+    marker.write_text("qecore-headless startup failed", encoding="utf-8")
+    # Even with a fully passing results.json present, the marker wins.
+    results = _write(tmp_path, _report("passed", "passed"))
+    assert main([str(results), "--failed-setup-marker", str(marker)]) == 1
+    out = capsys.readouterr().out
+    assert "before_all setup failed" in out
+    assert "Traceback" not in out
+
+
+def test_empty_results_file_exits_one(tmp_path, capsys):
+    path = _write_text(tmp_path, "")
+    assert main([str(path)]) == 1
+    assert "empty" in capsys.readouterr().out
+
+
+def test_whitespace_only_results_file_exits_one(tmp_path, capsys):
+    path = _write_text(tmp_path, "   \n  ")
+    assert main([str(path)]) == 1
+    assert "empty" in capsys.readouterr().out
 
 
 def test_malformed_json_exits_one_without_traceback(tmp_path, capsys):
-    path = tmp_path / "results.json"
-    path.write_text("not json at all {{{", encoding="utf-8")
+    path = _write_text(tmp_path, "not json at all {{{")
     assert main([str(path)]) == 1
     out = capsys.readouterr().out
-    assert "::error::Could not parse" in out
+    assert "incomplete or truncated" in out
     assert "Traceback" not in out
 
 
 @pytest.mark.parametrize("payload", ['{"features": []}', "42", '"string"'])
 def test_non_list_json_exits_one(tmp_path, capsys, payload):
-    path = tmp_path / "results.json"
-    path.write_text(payload, encoding="utf-8")
+    path = _write_text(tmp_path, payload)
     assert main([str(path)]) == 1
-    assert "::error::Could not parse" in capsys.readouterr().out
+    assert "incomplete or truncated" in capsys.readouterr().out
+
+
+def test_truncated_final_object_exits_one(tmp_path, capsys):
+    """Two whole features plus a cut-off third object: salvage drops the tail."""
+    path = _write_text(
+        tmp_path,
+        '[{"name": "a", "elements": []}, '
+        '{"name": "b", "elements": []}, '
+        '{"name": "c", "elements": [{"type": '[:60],
+    )
+    assert main([str(path)]) == 1
+    assert "incomplete or truncated" in capsys.readouterr().out
 
 
 def test_non_dict_feature_entry_exits_one(tmp_path, capsys):
     path = _write(tmp_path, ["oops"])
     assert main([str(path)]) == 1
-    assert "::error::Could not parse" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "0 passing scenarios" in out
+    assert "Traceback" not in out
 
 
 def test_non_dict_element_entry_exits_one(tmp_path, capsys):
     path = _write(tmp_path, [{"name": "f", "elements": ["oops"]}])
     assert main([str(path)]) == 1
-    assert "::error::Could not parse" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "0 passing scenarios" in out
+    assert "Traceback" not in out
 
 
 # ---------------------------------------------------------------------------
-# Helpers and CLI
+# Truncated-but-salvageable report still fails: passed count is not trusted
 # ---------------------------------------------------------------------------
 
 
-def test_count_statuses_tallies_every_status():
-    counts = count_statuses(
-        _report("passed", "failed", "skipped", "undefined", "untested", "weird")
+def test_salvaged_partial_report_counts_are_not_trusted(tmp_path, capsys):
+    """Even when salvage recovers features, an incomplete report fails closed."""
+    path = _write_text(
+        tmp_path,
+        '[{"name": "a", "elements": [{"type": "scenario", "name": "x", '
+        '"status": "passed"}]}, '
+        '{"name": "b", "elements": [{"type": "scenario", "name": "y", '
+        '"status": "passed"}]}, '
+        '{"name": "c", "elements": [{"type": "scenario", "name": "z", "s'[:60],
     )
-    assert counts == {
-        "passed": 1,
-        "failed": 1,
-        "skipped": 1,
-        "undefined": 1,
-        "untested": 1,
-        "other": 1,
-    }
+    assert main([str(path)]) == 1
+    out = capsys.readouterr().out
+    assert "incomplete or truncated" in out
 
 
-def test_format_breakdown_shape():
-    counts = count_statuses(_report("passed"))
-    assert format_breakdown(counts) == (
-        "KDE suite breakdown: passed=1 failed=0 skipped=0 "
-        "undefined=0 untested=0 other=0"
-    )
+# ---------------------------------------------------------------------------
+# Defaults and CLI
+# ---------------------------------------------------------------------------
 
 
-def test_cli_defaults_to_results_results_json(tmp_path):
+def test_cli_defaults_to_results_results_json(tmp_path, capsys):
     results_dir = tmp_path / "results"
     results_dir.mkdir()
     (results_dir / "results.json").write_text(
@@ -242,5 +279,17 @@ def test_cli_exits_one_on_all_undefined(tmp_path):
         text=True,
     )
     assert completed.returncode == 1
-    assert "::error::KDE suite reported 0 passing scenarios" in completed.stdout
+    assert "0 passing scenarios" in completed.stdout
     assert "Traceback" not in completed.stderr
+
+
+def test_cli_defaults_to_missing_results_json_exits_one(tmp_path):
+    """No results.json present: the CLI default fails closed like the import path."""
+    completed = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH)],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 1
+    assert "No results.json found" in completed.stdout
