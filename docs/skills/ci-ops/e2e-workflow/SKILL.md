@@ -443,21 +443,14 @@ Key differences from GNOME suites:
 - **Session setup:** SDDM autologin and a KDE determinism environment drop-in are
   written at disk-prep time.
 - **`passed > 0` backstop:** the step `Assert desktop suite has passing scenarios`
-  (KDE + GNOME GUI suites, `if: ... && steps.run.outputs.behave_rc == '0'`)
-  runs `python3 scripts/assert_passed.py results/results.json --skip-reason "${{ steps.kde_webdriver.outputs.skip_reason }}"`. It is the single
-  authoritative verdict contract for every desktop suite (GNOME in the
-  `gnome-e2e` action, KDE in `e2e.yml`): counts `status == 'passed'` scenarios
-  **positively** (backgrounds and other non-scenario elements are ignored) and
-  exits 1 with an `::error::` annotation when `passed <= 0`, when
-  `results.json` is missing/empty/truncated, or when a `failed_setup.txt`
-  marker is present. A deliberately inapplicable shard (KDE webdriver stack
-  could not be installed) is passed through `--skip-reason` and is a
-  **passing** terminal state for the gate, not a product failure — this is
-  distinct from a suite that self-disabled after the webdriver installed, which
-  still fails via `passed <= 0`. Never re-derive `passed` as `total - failed - skipped`: that
-  scores `undefined`/`untested` as passing and reproduces the exact false green
-  the guard exists to prevent. Behaviour is locked in by
-  `tests/unit/test_assert_passed.py`. The script must stay listed in the
+  runs `python3 scripts/assert_passed.py results/results.json --skip-reason "${{ steps.kde_webdriver.outputs.skip_reason }}"` for KDE + GNOME GUI suites
+  (`if: ... && steps.run.outputs.behave_rc == '0'`), the single authoritative verdict contract (GNOME via `gnome-e2e`, KDE via `e2e.yml`): counts
+  `status == 'passed'` scenarios **positively** (backgrounds and other non-scenario elements ignored) and exits 1 with an `::error::`
+  when `passed <= 0`, when `results.json` is missing/empty/truncated, or when a `failed_setup.txt` marker is present.
+  A deliberately inapplicable shard (KDE webdriver stack could not be installed) passes through `--skip-reason` for a **passing** terminal state —
+  distinct from a suite that self-disabled after the webdriver installed, which still fails via `passed <= 0`.
+  Never re-derive `passed` as `total - failed - skipped` (scores `undefined`/`untested` as passing and reproduces the false green
+  the guard exists to prevent). Behaviour is locked in by `tests/unit/test_assert_passed.py`; the script must stay listed in the
   `Checkout testsuite` sparse-checkout block or it will not exist at runtime.
 
 See [`references/kde-suites.md`](references/kde-suites.md) for the full workflow
