@@ -184,8 +184,10 @@ A host socket, key, or mount exposed to the guest desktop is a regression: stop 
 
 ## Status
 
-- [x] Provenance contract: digest resolved per run and recorded in
+- [x] Provenance contract: tested build recorded per run in
       `results/guest-provenance.json` (static pins expire after 2 weeks)
+- [ ] Provenance contract: resolve job that pins the digest per run
+      (sketched in `gnomeos-guest-provenance.md`; no workflow does this yet)
 - [x] Guest inventory verified against the image layers; four hive extensions documented
 - [x] Pre-boot preflight (`scripts/guest_preflight.py`) fails closed on missing prerequisites
 - [x] Mandatory service gate implemented and unit-tested (`scripts/extension_validation.py`)

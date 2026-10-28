@@ -50,7 +50,10 @@ REQUIREMENTS: dict[str, tuple[str, ...]] = {
     "gnome-extensions": ("usr/bin/gnome-extensions",),
     "gdbus": ("usr/bin/gdbus",),
     "python3": ("usr/bin/python3",),
-    "python-ensurepip": ("usr/lib/python3*/ensurepip/__init__.py",),
+    "python-ensurepip": (
+        "usr/lib/python3*/ensurepip/__init__.py",
+        "usr/lib64/python3*/ensurepip/__init__.py",
+    ),
     "python-gi": (
         "usr/lib/python3*/site-packages/gi/__init__.py",
         "usr/lib64/python3*/site-packages/gi/__init__.py",

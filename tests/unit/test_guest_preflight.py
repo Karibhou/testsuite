@@ -125,6 +125,13 @@ def test_builtin_uinput_satisfies_requirement(tmp_path: Path) -> None:
     assert check_requirements(root)["uinput"] == ["usr/lib/modules/7.3.0/modules.builtin"]
 
 
+def test_lib64_ensurepip_satisfies_requirement(tmp_path: Path) -> None:
+    lib64 = "usr/lib64/python3.14/ensurepip/__init__.py"
+    paths = [p for p in GNOME_OS_PATHS if "ensurepip" not in p] + [lib64]
+    root = _make_tree(tmp_path, paths)
+    assert check_requirements(root)["python-ensurepip"] == [lib64]
+
+
 def test_modules_builtin_without_uinput_does_not_satisfy(tmp_path: Path) -> None:
     paths = [p for p in GNOME_OS_PATHS if "uinput" not in p]
     root = _make_tree(tmp_path, paths)
