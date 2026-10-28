@@ -225,6 +225,10 @@ tag precedence order: `@quarantine` > `@hardware_blocked` > `@future` > `@pendin
 | `ujust toggle-devmode` group mutation | Medium | Non-interactive contract now exists: `bctl devmode --enable/--disable` (bluefinctl), which `toggle-devmode` execs to when `bctl` is present. Presence + idempotent state-check are covered in `common_devmode.feature`, gated `@requires_bctl` because bluefinctl is a Homebrew preinstall and `brew-setup.service` is masked in QEMU CI (#487). The actual group-mutating branch calls `pkexec usermod`, which requires an authentication agent bound to a real login session — unavailable over plain SSH. Scenario stays `@pending @wip`. Next step: a CI/lab-side non-interactive polkit or session-agent contract for `pkexec`; tracked in `projectbluefin/testsuite#500`. |
 | uupd conditional suppression | Medium | Battery and metered-network checks are not covered: uupd reads UPower and NetworkManager system-bus properties, while testsuite has no supported isolated state-injection contract. Do not use `/sys/class/power_supply` or GNOME proxy settings as substitutes. Next step: add a lab/image-owned simulation hook, then cover the upstream `/etc/uupd/config.json` contract. |
 
+Fast-lane service masks are classified in `startup_service_inventory.yaml`
+(see the [startup-service inventory](../../ci-ops/e2e-workflow/references/startup-service-inventory.md)).
+A `startup_contract` unit masked there is not qualified by a green fast-lane run.
+
 ### Skipped-coverage breakdown
 
 Why the `@pending`/`@future` scenarios above cannot run today.

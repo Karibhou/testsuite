@@ -498,3 +498,4 @@ Load these when you hit the specific topic:
 - [Migration inputs `migration-target` / `extra-tags` and the startup_failure they cause when missing.](references/migration-inputs.md)
 - [GNOME OS guest lane for the developer extension-validation service and its mandatory gate.](references/gnome-extensions-validation.md)
 - [GNOME OS image provenance (2-week tag expiry), verified guest inventory, and the extensions pre-boot preflight](references/gnomeos-guest-provenance.md)
+- [Which units the fast e2e lane masks, why, and which still need a startup-qualification lane.](references/startup-service-inventory.md)
