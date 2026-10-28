@@ -128,7 +128,7 @@ known statuses under their own key, and anything else — `error`, `hook_error`,
 missing `status` key, or any future behave status — under `other`. The invariant is
 `sum(counts.values()) == number of scenario elements`. Do not "fix" a new status by
 adding it to `SCENARIO_STATUSES` unless you also want it as its own summary column;
-the `other` bucket already guarantees nothing is lost. `scripts/assert_kde_passed.py`
+the `other` bucket already guarantees nothing is lost. `scripts/assert_passed.py`
 uses the same bucketing pattern — keep the two consistent.
 
 See [results-json-crash-tolerance.md](references/results-json-crash-tolerance.md) for how `load_report()` salvages a `results.json` truncated by a mid-run crash.
@@ -442,16 +442,15 @@ Key differences from GNOME suites:
   was added to `ExecStart` and when the checkout ref was changed to `master`.
 - **Session setup:** SDDM autologin and a KDE determinism environment drop-in are
   written at disk-prep time.
-- **`passed > 0` backstop:** the step `Assert KDE suite has passing scenarios`
-  (`if: startsWith(env.SUITE_DIR, 'kde') && steps.run.outputs.behave_rc == '0'`)
-  runs `python3 scripts/assert_kde_passed.py results/results.json`. The script
-  counts `status == 'passed'` scenarios **positively** (backgrounds and other
-  non-scenario elements are ignored) and exits 1 with an `::error::` annotation
-  when `passed <= 0`, when `results.json` is missing, or when it cannot be
-  parsed. Never re-derive `passed` as `total - failed - skipped`: that scores
-  `undefined`/`untested` as passing and reproduces the exact false green the
-  guard exists to prevent. Behaviour is locked in by
-  `tests/unit/test_assert_kde_passed.py`. The script must stay listed in the
+- **`passed > 0` backstop:** the step `Assert desktop suite has passing scenarios`
+  runs `python3 scripts/assert_passed.py results/results.json --skip-reason "${{ steps.kde_webdriver.outputs.skip_reason }}"` for KDE + GNOME GUI suites
+  (`if: ... && steps.run.outputs.behave_rc == '0'`), the verdict contract for the `e2e.yml` desktop suites (the `gnome-e2e` action does not call it yet): counts
+  `status == 'passed'` scenarios **positively** (backgrounds and other non-scenario elements ignored) and exits 1 with an `::error::`
+  when `passed <= 0`, when `results.json` is missing/empty/truncated, or when a `failed_setup.txt` marker is present.
+  A deliberately inapplicable shard (KDE webdriver stack could not be installed) passes through `--skip-reason` for a **passing** terminal state —
+  distinct from a suite that self-disabled after the webdriver installed, which still fails via `passed <= 0`.
+  Never re-derive `passed` as `total - failed - skipped` (scores `undefined`/`untested` as passing and reproduces the false green
+  the guard exists to prevent). Behaviour is locked in by `tests/unit/test_assert_passed.py`; the script must stay listed in the
   `Checkout testsuite` sparse-checkout block or it will not exist at runtime.
 
 See [`references/kde-suites.md`](references/kde-suites.md) for the full workflow

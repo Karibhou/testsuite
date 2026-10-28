@@ -92,7 +92,7 @@ still reports success. Treat the annotation as the signal; if the gate must
 become a hard job failure, that is a CI-interface change and needs a human
 decision (see `docs/skills/meta/human-gates/SKILL.md`).
 
-This mirrors `scripts/assert_kde_passed.py` (the KDE false-*green* backstop):
+This mirrors `scripts/assert_passed.py` (the false-*green* backstop):
 both are small `results.json` guards with a testable pure function, a `main()`,
 and unit tests in `tests/unit/`. `count_scenarios()` is reused rather than
 re-derived — never compute `passed` by subtraction, which scores
