@@ -12,14 +12,16 @@ metadata:
 
 Audits every GNOME 50-specific workaround in the repo against GNOME 51 and
 records what a **live `gnomeos-51` run** actually proved. This is the source of
-truth the `gnome` skill (`SKILL.md`) links to. Do **not** delete GNOME 50
-workarounds — Bluefin stays on GNOME 50. Version-branch (or fix) a workaround
-**only** after a 51 run proves the behavior genuinely diverged.
+truth the `gnome` skill (`SKILL.md`) links to. `dakota:testing` runs GNOME
+51.1, and smoke workarounds exercised there run on GNOME 51 in e2e runs
+(see §Run evidence). Keep GNOME 50 workarounds while any tested image still
+runs GNOME 50. Version-branch (or fix) a workaround **only** after a run
+proves the behavior genuinely diverged.
 
 ## Status key
 
 - **still required** — the workaround's behavior holds on GNOME 51; the run
-  confirmed it. Keep it (Bluefin needs it; GNOME 51 needs it).
+  confirmed it. Keep it for GNOME 51 and any tested image that needs it.
 - **broken on 51** — the run proved the workaround no longer works on GNOME 51;
   the step needs a GNOME 51 fix or a version branch.
 - **obsolete** — the workaround targets a GNOME 50 bug that no longer exists on
@@ -79,6 +81,9 @@ gh workflow run manual.yml \
 - **smoke-a:** 28 passed, 11 failed · **smoke-b:** 51 passed, 11 failed
 - **smoke-firefox:** passed
 
+- **`dakota:testing` PR VM check:** https://github.com/projectbluefin/testsuite/actions/runs/43170644165 — logs GNOME Shell 51. The image is GNOME 51.1 as of the update in [dakota#1796](https://github.com/projectbluefin/dakota/pull/1796).
+- **`dakota:testing` v1 gate:** https://github.com/projectbluefin/testsuite/actions/runs/43126910959 — smoke-a and smoke-b skip Calculator and Text Editor because they are not installed.
+
 The 11 failures in smoke-a and smoke-b are **Bluefin-only** (see §Bluefin-only
 failures) — extensions, power-status, tailscale, fastfetch, and failed-units are
 expected on plain gnomeos-51 and are **not** GNOME 51 divergences. The two
@@ -87,12 +92,13 @@ findings.
 
 ## Run findings — Calculator and Text Editor divergences
 
-These are **not** among the twelve workarounds above. They are vanilla GNOME
-app smoke scenarios that the maintainer flagged ("look at calculator and text
-editor"). Both fail on GNOME 51 and pass on GNOME 50 (Bluefin). They are
-**documented here, not fixed** — the fix requires the GNOME 51 AT-SPI tree for
-each app, which cannot be captured locally (no VM here, `qecore` not
-importable). Do not treat the notes below as fixes.
+These are **not** among the twelve workarounds above. The Calculator and Text
+Editor smoke scenarios diverge on plain `gnomeos-51` (run 42919511431 above);
+they are not shipped in `dakota:testing` (v1 gate run 43126910959 above), so
+that image neither passes nor fails them. They are **documented here, not
+fixed**. The PR VM check can capture the GNOME 51 AT-SPI tree for apps installed
+in `dakota:testing`, but cannot cover these absent apps. Do not treat the notes
+below as fixes.
 
 ### Calculator display lookup — broken on 51
 
