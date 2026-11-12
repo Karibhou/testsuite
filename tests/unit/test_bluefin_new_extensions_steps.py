@@ -373,7 +373,7 @@ class TestWaitGnomeShellAccessible:
 
 
 # ---------------------------------------------------------------------------
-# Copyous clipboard helpers: payload on stdin, wl-copy's output detached
+# Copyous clipboard helpers: binary-safe staging and detached wl-copy
 # ---------------------------------------------------------------------------
 
 _SSH = ["ssh", "-i", "/key", "-p", "2222", "bluefin@127.0.0.1"]
@@ -400,7 +400,10 @@ class TestClipboardSet:
         argv = run.call_args.args[0]
         assert argv[: len(_SSH)] == _SSH
         inner = argv[-1]
-        assert "wl-copy >/dev/null 2>" in inner
+        assert 'cat >"$payload"' in inner
+        assert 'wl-copy <"$payload" >/dev/null 2>"$err"' in inner
+        assert inner.index('cat >"$payload"') < inner.index("wl-copy")
+        assert 'rm -f "$payload" "$err"' in inner
         assert "/tmp/session.env" in inner
         assert run.call_args.kwargs["timeout"] == 30
         assert run.call_args.kwargs["capture_output"] is True
@@ -410,7 +413,7 @@ class TestClipboardSet:
             run = self._run(mod, "hello")
         argv = run.call_args.args[0]
         assert argv[:2] == ["sh", "-c"]
-        assert "wl-copy >/dev/null 2>" in argv[2]
+        assert 'wl-copy <"$payload" >/dev/null 2>"$err"' in argv[2]
 
     def test_a_failure_reports_wl_copys_stderr(self, mod):
         with pytest.raises(AssertionError, match="Failed to connect to a Wayland server"):

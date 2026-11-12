@@ -95,6 +95,16 @@ lock is disabled.
 
 GNOME 51 (GA 2026-09-16) is Wayland-only and freezes the extension API. Keep every GNOME 50 workaround until a `gnomeos-51` run proves it obsolete — inventory, ground rules and validation procedure in [`references/gnome-51-audit.md`](references/gnome-51-audit.md).
 
+## Clipboard commands over SSH
+
+`wl-copy` forks a selection-serving child. Redirect all three of its standard
+streams away from the SSH channel: first stage the binary-safe payload from
+stdin in a guest temporary file, then use that file as `wl-copy`'s stdin and
+redirect its output streams. Remove the temporary files on success and failure.
+Redirecting output alone can still leave the child holding the input channel
+and cause a timeout. Utah smoke runs are needed to verify Copyous scenarios;
+Dakota skips their `@bluefin` tag.
+
 ## Remote session commands from the runner container
 
 Commands that access the GNOME user session, including `gsettings`, `gdbus
