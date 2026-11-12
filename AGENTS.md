@@ -119,6 +119,7 @@ files there. Never write to `ublue-os/*` or any KDE property at all.
 - **Never create issues, PRs, comments, forks, or writes in read-only upstream namespaces.** Read-only API calls are allowed; see `docs/skills/meta/human-gates/SKILL.md` for the prohibition details. **This explicitly includes all KDE properties (`invent.kde.org`, `bugs.kde.org`, KDE Matrix rooms, `KDE/*` mirrors) — read-only, no exceptions, for sub-agents and scheduled jobs too.**
 - **Workflow action references must be pinned.** External `uses:` must be a full commit SHA with a version comment. Never use floating tags.
 - **No WIP PRs.** Every open PR must be ready to merge: green CI, complete scope, no placeholder commits.
+- **Closing keywords only when this PR's checks can prove the fix.** If the issue's failure appears only on an image the PR VM check doesn't boot (today anything but `dakota:testing`, for example Utah or a `@bluefin` scenario), write `Refs #N` in the PR body, and make sure `Fixes #N`, `Closes #N` or `Resolves #N` appears nowhere in the body or in commit messages. GitHub acts on the keyword wherever it appears. Ask a maintainer to run `manual.yml` on that image from the PR's head and to close the issue once it passes. See [candidate VM validation](docs/skills/ci-ops/ops/references/candidate-vm-validation.md).
 - **Concurrent PRs must own disjoint files.** There is no cap on how many PRs
   you may have open. The real constraint is conflict, not count: before opening
   a PR, check that no other open PR already touches the files you are about to

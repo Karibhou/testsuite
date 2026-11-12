@@ -81,6 +81,23 @@ not `main`/`v1`. Pin `image` by digest (`ghcr.io/...@sha256:...`) so the
 candidate identity is immutable, and pass `test_ref` as the head SHA rather than
 the branch name. Never rely on `e2e.yml`'s `test_ref: main` default for this.
 
+## Validating a fix for another image
+
+For the issue-closing rule, see [Hard boundaries](../../../../../AGENTS.md#hard-boundaries).
+To validate a PR's tests on another image without pushing a branch, a maintainer
+can dispatch the workflow from `main`, passing the PR head SHA:
+
+```bash
+gh workflow run manual.yml -R projectbluefin/testsuite --ref main -f image=<image> -f suites=<suites> -f test_ref=<PR head SHA>
+```
+
+Run [43271798804](https://github.com/projectbluefin/testsuite/actions/runs/43271798804)
+is an example using `utah:testing`. Close the issue once validation passes.
+If a merged PR closed the issue without fixing it, reopen it with a comment
+explaining what remains and add the `hive: churn-triaged` label in the same
+step. Without that label, the hive's churn guard withholds an issue after two
+merged PRs.
+
 ## Audited signal state before the gate (2026-10-28, `main` 3e5d45ad)
 
 - Combined commit status: no statuses at all. No ghost-lab or other external
