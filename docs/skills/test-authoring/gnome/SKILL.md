@@ -113,6 +113,12 @@ In container mode, `environment.py` writes `/tmp/session.env` at session init wi
 active session addresses; `_run_host()` sources it and runs under bash so `/bin/sh`
 does not abort on a missing file.
 
+Clipboard writes over SSH must stage the payload in a guest temporary file
+before starting `wl-copy`, and redirect all three standard streams away from
+the SSH channel. Its selection-serving child can inherit those descriptors
+after the parent exits. Keep the payload on stdin during transfer so NUL bytes
+and large clipboard entries are preserved, and remove temporary files on exit.
+
 ## GNOME 51 accessibility gsettings round-trips (@requires_gnome_51)
 
 GNOME 51 added two `org.gnome.desktop.a11y.interface` settings pre-51 images lack
