@@ -188,19 +188,17 @@ _SESSION_ENV = "[ -f /tmp/session.env ] && . /tmp/session.env; "
 
 
 def _clipboard_set(text: str) -> None:
-    """Put ``text`` on the clipboard, fed to wl-copy on stdin.
+    """Put UTF-8 text, including NUL bytes, on the clipboard.
 
-    On stdin, not argv: a NUL byte cannot go in an argument (Python raises
-    ValueError before running anything). wl-copy forks a child that keeps
-    serving the selection; it inherits wl-copy's stdout and stderr, so with
-    those on the SSH channel ssh waits for the child and hangs to the
-    timeout. Send stdout to /dev/null and stderr to a file, shown only if
-    wl-copy fails.
+    Stage stdin on the guest before starting wl-copy so its selection-serving
+    child cannot keep the SSH channel open through any standard descriptor.
     """
     inner = _SESSION_ENV + (
-        'err=$(mktemp); '
-        'if wl-copy >/dev/null 2>"$err"; then rm -f "$err"; '
-        'else cat "$err" >&2; rm -f "$err"; exit 1; fi'
+        'dir=$(mktemp -d) || exit 1; '
+        'trap \'rm -rf "$dir"\' EXIT; '
+        'cat >"$dir/payload" || exit 1; '
+        'if wl-copy <"$dir/payload" >/dev/null 2>"$dir/error"; then :; '
+        'else cat "$dir/error" >&2; exit 1; fi'
     )
     argv = ssh_argv() + [inner] if _IN_CONTAINER else ["sh", "-c", inner]
     result = subprocess.run(

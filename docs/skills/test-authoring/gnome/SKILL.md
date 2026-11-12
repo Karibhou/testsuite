@@ -113,6 +113,14 @@ In container mode, `environment.py` writes `/tmp/session.env` at session init wi
 active session addresses; `_run_host()` sources it and runs under bash so `/bin/sh`
 does not abort on a missing file.
 
+For clipboard writes, `_clipboard_set` stages the byte payload in a temporary
+guest file before starting `wl-copy`, and redirects all three of its standard
+streams away from SSH. The selection-serving child may inherit stdin as well as
+stdout and stderr; redirecting only its output can still hold the SSH session
+open. Keep the temporary files private and remove them when the command exits.
+The Dakota PR check skips the Bluefin-only Copyous stress scenarios; use a Utah
+smoke run to validate them.
+
 ## GNOME 51 accessibility gsettings round-trips (@requires_gnome_51)
 
 GNOME 51 added two `org.gnome.desktop.a11y.interface` settings pre-51 images lack

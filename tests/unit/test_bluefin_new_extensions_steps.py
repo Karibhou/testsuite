@@ -400,7 +400,10 @@ class TestClipboardSet:
         argv = run.call_args.args[0]
         assert argv[: len(_SSH)] == _SSH
         inner = argv[-1]
-        assert "wl-copy >/dev/null 2>" in inner
+        assert 'cat >"$dir/payload" || exit 1' in inner
+        assert 'wl-copy <"$dir/payload" >/dev/null 2>"$dir/error"' in inner
+        assert inner.index('cat >"$dir/payload"') < inner.index("wl-copy ")
+        assert 'trap \'rm -rf "$dir"\' EXIT' in inner
         assert "/tmp/session.env" in inner
         assert run.call_args.kwargs["timeout"] == 30
         assert run.call_args.kwargs["capture_output"] is True
@@ -410,7 +413,7 @@ class TestClipboardSet:
             run = self._run(mod, "hello")
         argv = run.call_args.args[0]
         assert argv[:2] == ["sh", "-c"]
-        assert "wl-copy >/dev/null 2>" in argv[2]
+        assert 'wl-copy <"$dir/payload" >/dev/null 2>"$dir/error"' in argv[2]
 
     def test_a_failure_reports_wl_copys_stderr(self, mod):
         with pytest.raises(AssertionError, match="Failed to connect to a Wayland server"):
