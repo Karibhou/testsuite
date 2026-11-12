@@ -115,6 +115,8 @@ and first-login claims, use the proposed
 [desktop qualification contract](references/desktop-first-login.md); its
 image eligibility and hosted evidence gates remain separate from smoke and
 migration results.
+The Utah candidate's pinned image inspection is recorded there; an image
+filesystem alone cannot establish the installed ESP loader or first-boot pages.
 
 Modern bootc/ostree images write Boot Loader Specification (BLS) entries (`/boot/loader/entries/*.conf`) regardless of whether the physical distribution targets GRUB 2 (like Bluefin / Bluefin LTS) or systemd-boot (like Dakota).
 

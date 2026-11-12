@@ -62,6 +62,26 @@ argument, change vendor page policy, seed a user for a GIS profile, swap images,
 or convert the run into a smoke pass. Maintainers approve this admission record
 before runtime implementation is treated as image qualification.
 
+### Utah testing candidate, x86_64
+
+Read-only filesystem inspection on 2026-11-12 used
+`ghcr.io/projectbluefin/utah@sha256:bb9aea734d6a099444067af29c0783057465f0779ffc058bae4014b4a1cd97e0`
+(`utah:testing` at inspection time). This is a candidate record, not an
+approved admission or a successful boot.
+
+| Field | Inspection and remaining evidence |
+|---|---|
+| Disk and preparation | Use the `e2e.yml` `bootc install to-disk` loopback recipe on a fresh 40 GiB disk, ext4 and `--wipe`, without seeding a regular user or enabling GDM autologin. Unlike the smoke recipe, do not substitute systemd-boot or accept a failed bootloader installation for direct-kernel boot. Disk checksum and exact installer/version are **to confirm in #1026's probe child**: no disk was installed or inspected here. |
+| Loader | The image contains bootupd 0.3.2, GRUB EFI and systemd-boot packages. `/usr/lib/bootupd/updates/EFI.json` names `grub2-1:2.12-66.fc44,shim-16.1-7` and has a null `default-bootloader`. The actual ESP loader is **to confirm in #1026's probe child** by inspecting the installed disk; package presence alone does not establish what the installer writes. |
+| Display manager | GDM 51 is installed. Image `/etc/gdm/custom.conf` contains empty daemon, security and debug sections; no autologin is configured there. `/usr/etc` and `/usr/lib/gdm/{custom,daemon}.conf` are absent, as is `/etc/gdm/daemon.conf`. Installed-disk configuration and the running greeter remain **to confirm in #1026's probe child**. |
+| Initial users | `/usr/lib/passwd` is absent. Image `/etc/passwd` has one uid ≥1000: `nobody`, uid/gid 65534, home `/`, shell `/usr/sbin/nologin`; it is not a regular login user. No other such entries were present. Confirm the installed disk has no regular user before boot in #1026's probe child. No shadow data was inspected. |
+| Initial setup | GNOME Initial Setup 51.1 is installed. `/usr/share/gnome-initial-setup/vendor.conf` sets `[pages] existing_user_only=language;keyboard`; `/etc/gnome-initial-setup/vendor.conf` sets `[pages] skip=software`. Effective configuration precedence, the ordered page sequence and skipped pages are **to confirm in #1026's probe child**: filesystem inspection alone does not establish the actual first-boot path or conditional pages. |
+| Locale and keyboard | Neither `/etc/locale.conf` nor `/etc/vconsole.conf` exists in the image; `/usr/etc` is absent. Effective defaults and any first-boot selection are **to confirm in #1026's probe child**. |
+| Final state | Expect a newly created regular user and a usable desktop session. Image `/etc/login.defs` sets `UID_MIN 1000` and `UID_MAX 60000`, but the actual uid and groups, successful authentication and desktop usability are **to confirm in #1026's probe child**; no account was created during inspection. |
+
+The image digest is immutable; repeat inspection and admission if it changes.
+Do not infer a disk checksum, page order or successful journey from this record.
+
 ## Minimal fixture contract
 
 Proposed interface, not new reusable workflow inputs:
