@@ -12,9 +12,9 @@ metadata:
 
 Audits every GNOME 50-specific workaround in the repo against GNOME 51 and
 records what a **live `gnomeos-51` run** actually proved. This is the source of
-truth the `gnome` skill (`SKILL.md`) links to. Do **not** delete GNOME 50
-workarounds — Bluefin stays on GNOME 50. Version-branch (or fix) a workaround
-**only** after a 51 run proves the behavior genuinely diverged.
+truth the `gnome` skill (`SKILL.md`) links to. Do **not** delete a shared GNOME
+50 workaround while any tested image still needs it. Version-branch or fix a
+workaround only when a run proves the behavior genuinely diverged.
 
 ## Status key
 
@@ -87,12 +87,13 @@ findings.
 
 ## Run findings — Calculator and Text Editor divergences
 
-These are **not** among the twelve workarounds above. They are vanilla GNOME
-app smoke scenarios that the maintainer flagged ("look at calculator and text
-editor"). Both fail on GNOME 51 and pass on GNOME 50 (Bluefin). They are
-**documented here, not fixed** — the fix requires the GNOME 51 AT-SPI tree for
-each app, which cannot be captured locally (no VM here, `qecore` not
-importable). Do not treat the notes below as fixes.
+These are **not** among the twelve workarounds above. Both apps have failing
+scenarios on plain GNOME OS 51 in the run above. Bluefin's `dakota:testing`
+image runs GNOME 51.1 but does not ship either app: its scenarios skip, rather
+than pass, as shown by the smoke-a and smoke-b jobs in
+[run 43126910959](https://github.com/projectbluefin/testsuite/actions/runs/43126910959).
+These divergences are documented, not fixed here; a fix needs diagnostics from
+an image that actually ships the apps.
 
 ### Calculator display lookup — broken on 51
 
