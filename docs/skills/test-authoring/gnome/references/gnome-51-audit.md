@@ -38,7 +38,7 @@ Version-branch or fix a workaround only after a run proves behavior diverges.
 
 | # | Workaround | Status (GNOME 51) | Where |
 |---|---|---|---|
-| 1 | Re-prepend `global.context.unsafe_mode = true` before every `Shell.Eval` (GNOME 50 reset it) | **LIKELY-KEEP** — not exercised by the smoke-a/smoke-b run (Bluefin-only Shell.Eval reads); still required on 50, assume it holds on 51 until a run says otherwise | `tests/smoke/features/steps/steps.py`; documented in `SKILL.md` "Screen Lock/Unlock" / "Overview search entry" |
+| 1 | Re-prepend `global.context.unsafe_mode = true` before every `Shell.Eval` (GNOME 50 reset it) | **EXERCISED ON 51; necessity unproven** — [dakota smoke-b run 43170644165](https://github.com/projectbluefin/testsuite/actions/runs/43170644165) logged successful prefixed Quick Settings open, read and close calls. The runner also enables an extension that restores unsafe mode, so these calls do not prove the prefix is needed; retain it for GNOME 50 images. The smoke-specific calls remain unverified. | `tests/shared/gnome_shell_steps.py:29-38,298-309,356-358`; `tests/smoke/features/steps/steps.py` |
 | 2 | Double-quoted `Shell.Eval` results `(true, '"true"')` | **LIKELY-KEEP** — not exercised by the run; the `clutter_text.get_text()` tuple format is unchanged upstream | `tests/smoke/features/steps/steps.py` |
 | 3 | Extension `state=6` via `Shell.Eval` → use `GetExtensionInfo` D-Bus | **LIKELY-KEEP** — no extensions on plain gnomeos, so the state check is not exercised; the D-Bus method is the only public path and still required | `tests/smoke/features/steps/steps.py`; `SKILL.md` "Extension state via D-Bus" |
 | 4 | `filler`/`frame` toplevel-role fallback + require populated subtree | **WORKS ON 51** — Files, Calculator, Text Editor, and fractional/integer scale windows resolved their toplevels; the run does not prove which fallback was needed | `tests/shared/gnome_shell_steps.py`; `SKILL.md` "Window-role checks must prove the subtree is populated" |
@@ -54,10 +54,12 @@ Version-branch or fix a workaround only after a run proves behavior diverges.
 Rows 4, 5, 6, and 10 worked in the run in §Run evidence; a passing scenario
 does not prove that the workaround is required. Rows 9 and 11 passed scenarios
 that did not measure the affected properties; targeted probes (§Targeted
-probes) have since measured them. Rows 1, 2, 3, 8, and 12 were not exercised by
-the plain GNOME OS smoke run and carry `LIKELY-KEEP`. Row 7 was also skipped on
+probes) have since measured them. Row 1's shared helper was exercised on
+`dakota:testing`, but its necessity and the smoke-specific calls remain
+unverified. Rows 2, 3, 8, and 12 were not exercised by the plain GNOME OS
+smoke run and carry `LIKELY-KEEP`. Row 7 was also skipped on
 `dakota:testing` because Ptyxis was absent. **This audit is incomplete**: issue
-#827 still requires evidence for the rows not yet exercised (1, 2, 3, 7, 8 and
+#827 still requires evidence for the remaining paths (1, 2, 3, 7, 8 and
 12) and for the clock and System toggles in row 11.
 
 ## Run target
