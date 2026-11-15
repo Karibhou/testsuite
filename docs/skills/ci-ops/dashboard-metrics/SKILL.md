@@ -91,7 +91,7 @@ This skill guides agents through modifying, compiling, and deploying the QA dash
 
 10. **Tailwind v4 via `@tailwindcss/vite` (no Astro integration)**: The dashboard uses Tailwind CSS v4 through the official Vite plugin (`@tailwindcss/vite`), declared in `astro.config.mjs` under `vite.plugins`, plus `@import "tailwindcss";` in `src/styles/global.css` (loaded via a `<style is:global>` block in `src/layouts/Layout.astro`). Custom design tokens live in the CSS `@theme` block in that file, not in a `tailwind.config.*` file — v4 is CSS-first, so config-file content globbing is gone. The deprecated `@astrojs/tailwind` integration (which capped `astro` at v5 via `peer astro@"^3.0.0 || ^4.0.0 || ^5.0.0"` and froze the `vite`/`esbuild`/`sharp` patch stream) must not be re-added. With the cap gone, `renovate.json` no longer constrains the astro major; validate any astro major bump locally with `cd dashboard && rm -rf node_modules && npm ci && npm run build` — `npm install` alone is not sufficient, because it resolves differently than `npm ci`.
 
-11. **`publish-to-pages.yml` is not exercised by PR checks**: the workflow only triggers on `schedule`, `workflow_dispatch`, and pushes to `main` under `dashboard/**`. A dependency PR can therefore merge fully green and only break the dashboard hours later on the next 2-hourly cron. Any PR touching `dashboard/package.json`, `dashboard/package-lock.json`, or `dashboard/scripts/**` must be validated locally with `npm ci && npm run build` before merge.
+11. **Dashboard PR checks**: `dashboard-build.yml` runs on every pull request and merge group, but builds only when `dashboard/**` or the workflow itself changed. It compiles with an empty runs directory and uses the same Python, Node, and npm build steps as `publish-to-pages.yml`; keep those versions and action pins aligned.
 
 ## Common Rationalizations
 
@@ -100,7 +100,7 @@ This skill guides agents through modifying, compiling, and deploying the QA dash
 | "I will hardcode `./raw-runs` in my script since I am running it from the root." | Someone else or the GHA run will execute it from another folder and fail with a directory mismatch. Always resolve paths relative to the script location. |
 | "Astro should fetch all logs from a remote database in the browser." | Fetching hundreds of logs in client-side JS introduces major latency. Compiling them statically at build-time using `import.meta.glob` is faster and completely serverless. |
 | "The CNAME to qa.projectbluefin.io must be preserved on every deploy." | qa.projectbluefin.io is a redirect, not this site's domain. Writing CNAME claims a name that 301s away and 404s. Never write CNAME — serve from https://projectbluefin.github.io/testsuite/ via base: '/testsuite/'. |
-| "A dependency bump PR is green, so the dashboard still builds." | `publish-to-pages.yml` never runs on pull requests. Green PR checks say nothing about `npm ci`; run it locally before merging any `dashboard/` dependency change. |
+| "A dependency bump PR is green, so the dashboard still builds." | Check that `Dashboard build` ran and built the changed dashboard; a skipped build does not validate unrelated inputs. |
 
 ## Behave converter CLI
 

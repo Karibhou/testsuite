@@ -14,12 +14,9 @@ metadata:
 
 `.github/workflows/publish-to-pages.yml` builds the dashboard and runs on `schedule`,
 `push` to `main` (paths-filtered), and `workflow_dispatch` — never on `pull_request`.
-Nothing validates the dashboard build while a PR is open, so a dependency bump can be
-merged fully green and only fail afterwards, on a schedule tick that no human is
-watching. The classic signature is an `npm ci` `ERESOLVE` peer-dependency conflict
-introduced by an automated dependency-update PR: the lockfile resolves locally, the PR
-checks are all unrelated, and the workflow then fails on every scheduled run until
-someone happens to open the Actions tab.
+`dashboard-build.yml` provides the PR and merge-queue build counterpart without
+publishing or downloading historical runs. It reports on every PR and skips its
+build steps when neither `dashboard/**` nor the check workflow changed.
 
 **Rule: when a workflow validates an artifact that PRs can break, it needs a
 PR-triggered counterpart.** Otherwise its first red run is on `main`, after the
@@ -115,13 +112,13 @@ echoes `steps.build.outputs.digest`) must be guarded with `if: github.event_name
 canonical shape of “PR-triggered counterpart” for a workflow that also publishes: build
 on PR, push on everything else.
 
-## Runner-image failures on main open an alert issue
+## Runner-image and dashboard failures on main open an alert issue
 
-A PR trigger only covers changes made through a PR. The weekly cron rebuild of
-`build-runner.yml` and `build-kde-runner.yml` can still break on a new base image
-or pip release with no PR in sight. `.github/workflows/ci-alert.yml` listens for
-both workflows (`workflow_run`, `completed`) and, for `push` and `schedule` runs on
-`main`:
+A PR trigger only covers changes made through a PR. Scheduled runner builds
+and dashboard publishes can still fail without a PR. `.github/workflows/ci-alert.yml`
+listens for `build-runner.yml`, `build-kde-runner.yml`, and
+`publish-to-pages.yml` (`workflow_run`, `completed`) for `push` and `schedule`
+runs on `main`:
 
 - on failure, cancellation or timeout, creates or reopens one issue per workflow,
   titled `[CI] <workflow name> failed on main`, listing the failed jobs;
@@ -130,10 +127,14 @@ both workflows (`workflow_run`, `completed`) and, for `push` and `schedule` runs
   run cannot close a newer alert. It compares runs, not `main` HEAD, because the
   builds are path-filtered: HEAD usually moves past the commit a build ran on.
 
+Dashboard publishes cancel older publishes. A cancelled dashboard run with a
+newer push or scheduled run on main does not open an alert; the newer run
+provides the outcome instead. Runner-image cancellation handling is unchanged.
+
 The title is built from `github.event.workflow_run.name` (passed through `env:`) in
-both the lookup and the create step, so the two runner builds never share or
-close each other's alert. If you rename either workflow's `name:`, update the
-`workflows:` list in `ci-alert.yml` in the same PR, or the alert stops firing.
+both the lookup and create step, so workflows never share or close each other's
+alert. If a workflow is renamed, update the `workflows:` list in `ci-alert.yml`
+in the same PR, or its alert stops firing.
 
 ## Status
 

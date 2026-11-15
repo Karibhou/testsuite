@@ -1,0 +1,62 @@
+name: Dashboard build
+
+on:
+  pull_request:
+    branches: [main]
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Dashboard build
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check for dashboard changes
+        id: changes
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          MERGE_BASE: ${{ github.event.merge_group.base_sha }}
+        run: |
+          set -euo pipefail
+          base="${PR_BASE:-$MERGE_BASE}"
+          if git diff --quiet "$base" HEAD -- dashboard/ .github/workflows/dashboard-build.yml; then
+            echo 'No dashboard changes; skipping build.'
+          else
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Python Environment
+        if: steps.changes.outputs.changed == 'true'
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: '3.15'
+
+      - name: Compile Rollup Data Index
+        if: steps.changes.outputs.changed == 'true'
+        run: python3 dashboard/scripts/compile_data.py
+
+      - name: Set up Node.js Environment
+        if: steps.changes.outputs.changed == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '26'
+          cache: 'npm'
+          cache-dependency-path: 'dashboard/package-lock.json'
+
+      - name: Install Dashboard Dependencies
+        if: steps.changes.outputs.changed == 'true'
+        working-directory: dashboard
+        run: npm ci
+
+      - name: Build Dashboard & Index Search
+        if: steps.changes.outputs.changed == 'true'
+        working-directory: dashboard
+        run: npm run build
